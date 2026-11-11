@@ -131,6 +131,11 @@ svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .evs{display:flex;flex-direction:column;gap:8px}
 .pchip{display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:5px;font-size:12.5px;font-weight:700;white-space:nowrap;background:var(--pc,#5F6B7A);color:var(--pt,#FFFFFF);flex:none}
 .ev-row .pchip{height:28px;min-width:60px;font-size:13.5px;border-radius:7px}
+.pgrp{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0}
+.pgrp.has-more>:first-child{padding-right:62px}
+.morep{position:absolute;top:8px;right:8px;min-width:44px;height:30px;padding:0 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--accent);font-size:13px;font-weight:700}
+.morep[aria-expanded="true"]{color:var(--muted)}
+.ev-row.sub,.pitem.sub{margin-left:14px;width:calc(100% - 14px)}
 .ev-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border:1px solid var(--line-soft);border-radius:12px;background:var(--sunken);text-align:left;width:100%;min-width:0}
 button.ev-row:hover{border-color:var(--line)}
 .ev-row .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -215,6 +220,9 @@ button.ev-row:hover{border-color:var(--line)}
   .pitem .r2{font-size:12px;color:var(--fg-2);overflow-wrap:anywhere}
   .pitem .eqs{font-family:var(--mono);font-size:11.5px;font-weight:600}
   .pitem .pchip{height:20px;font-size:12px;padding:0 7px}
+  .pitems .pgrp{gap:4px}
+  .pitems .pgrp.has-more>:first-child{padding-right:40px}
+  .pitems .morep{top:4px;right:4px;min-width:32px;height:22px;padding:0 6px;font-size:11.5px}
   .wk{margin:0 6px 8px}
 }
 .daypanel{display:flex;flex-direction:column;gap:10px}
@@ -453,6 +461,7 @@ const safeUrl=u=>/^https?:\/\//i.test(String(u||''))?u:'';
 
 /* ---------- state ---------- */
 const now=new Date();
+const OPENP=new Set(); /* 같은 날 같은 사람 일정 펼침 상태: '날짜|이름' */
 const S={
   events:[],contacts:[],customers:{},requests:[],settings:{},
   loading:true,live:false,readOnly:false,admin:false,
@@ -528,12 +537,20 @@ const placesOf=e=>Array.isArray(e.places)&&e.places.length?e.places:(e.customer?
 const pName=p=>p.customer==='기타'?(p.customerName||'기타'):p.customer;
 const placeOf=e=>placesOf(e).map(p=>[pName(p),p.site].filter(Boolean).join(' ')).join(' · ');
 const uniqP=ents=>{const seen=new Set();return ents.filter(x=>!seen.has(x.p)&&seen.add(x.p))};
+/* 같은 날 같은 사람의 일정은 한 줄만 보이고 '+n'을 누르면 나머지가 펼쳐짐 */
+function grpRows(day,ents,one){
+  const m=new Map();ents.forEach(x=>{if(!m.has(x.p))m.set(x.p,[]);m.get(x.p).push(x)});
+  return [...m.values()].map(xs=>{
+    const key=day+'|'+xs[0].p,more=xs.length-1,open=more&&OPENP.has(key);
+    return `<div class="pgrp${more?' has-more':''}">${one(xs[0],'')}${more?`<button type="button" class="morep" data-act="more-p" data-k="${esc(key)}" aria-expanded="${open}" aria-label="${open?'접기':esc(xs[0].p)+'의 같은 날 일정 '+more+'개 더 보기'}">${open?'접기':'+'+more}</button>`:''}${open?xs.slice(1).map(x=>one(x,'sub')).join(''):''}</div>`;
+  }).join('');
+}
 function entRow(x,opts){
-  const e=x.e;
+  const e=x.e;const xc=opts&&opts.cls?' '+opts.cls:'';
   const range=(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
   const tag=S.readOnly?'div':'button';
   const eq=(e.equipment||[]);
-  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row">
+  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${xc}">
     <span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span>
     <span class="body">
       <span class="l1"><b>${esc(placeOf(e))}</b>${range?`<span class="small muted mono">${range}</span>`:''}</span>
@@ -583,7 +600,7 @@ function vToday(){
       <section class="card" aria-labelledby="tdH">
         <div class="card-h"><h2 id="tdH">오늘의 일정</h2>${ents.length?`<span class="pill">출장 ${uniqP(ents).length}명</span>`:''}</div>
         ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:
-          ents.length?`<div class="evs">${ents.map(x=>entRow(x)).join('')}</div>`:
+          ents.length?`<div class="evs">${grpRows(t,ents,(x,c)=>entRow(x,{cls:c}))}</div>`:
           `<div class="empty">오늘은 등록된 출장이 없어요.${S.readOnly?'':`<button type="button" class="btn sm" data-act="go" data-v="cal">캘린더에서 일정 추가</button>`}</div>`}
         ${nx.length?`<div class="next"><span><b>다음 일정</b> · ${fmtDay(nx[0].start)}</span>${nx.map(e=>`<span>${esc(e.person)} · ${esc(placeOf(e))}</span>`).join('')}</div>`:''}
       </section>
@@ -626,11 +643,11 @@ function vCal(){
       const cls=['cell'];
       if(d.getMonth()!==S.m)cls.push('out');
       if(k===t)cls.push('today');if(k===S.sel&&!isWide())cls.push('sel');
-      const pi=ents.map(x=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
-        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem">
+      const pi=grpRows(k,ents,(x,c)=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
+        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem${c?' '+c:''}">
           <span class="r1"><span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span><span class="pl">${esc(placeOf(e))}</span></span>
           ${eq||e.work?`<span class="r2">${eq?`<span class="eqs">${esc(eq)}</span>`:''}${eq&&e.work?' · ':''}${esc(e.work||'')}</span>`:''}
-        </${tag}>`}).join('');
+        </${tag}>`});
       cells+=`<div class="${cls.join(' ')}">
         <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${uniqP(ents).length}명${S.readOnly?'':', 눌러서 일정 추가'}">
           <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${ents.length?uniqP(ents).length+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
@@ -645,7 +662,7 @@ function vCal(){
   if(S.sel){
     const ents=entriesOn(S.sel);
     panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">출장 ${uniqP(ents).length}명</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
-      (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${ents.map(x=>entRow(x,{memo:true})).join('')}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`);
+      (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${grpRows(S.sel,ents,(x,c)=>entRow(x,{memo:true,cls:c}))}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`);
   }else panel=`<div class="empty">날짜를 누르면 그날 일정과 일정 추가 버튼이 나와요</div>`;
   return `
   <div class="vh">
@@ -670,7 +687,7 @@ function vList(){
     <div class="mnav"><button type="button" class="ib flat" data-act="month" data-n="-1" aria-label="이전 달">${ic('back')}</button><h1>${S.y}년 ${S.m+1}월 목록</h1><button type="button" class="ib flat" data-act="month" data-n="1" aria-label="다음 달">${ic('next')}</button></div>
   </div>
   ${personFilters()}
-  ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:days.length?days.map(([k,ents])=>`<section class="grp"><h3>${fmtDay(k)} <span>${ents.length}명</span></h3><div class="evs">${ents.map(x=>entRow(x,{memo:true})).join('')}</div></section>`).join(''):`<div class="empty">이 달에는 등록된 출장이 없어요</div>`}`;
+  ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:days.length?days.map(([k,ents])=>`<section class="grp"><h3>${fmtDay(k)} <span>${uniqP(ents).length}명</span></h3><div class="evs">${grpRows(k,ents,(x,c)=>entRow(x,{memo:true,cls:c}))}</div></section>`).join(''):`<div class="empty">이 달에는 등록된 출장이 없어요</div>`}`;
 }
 
 function vContacts(){
@@ -1183,6 +1200,7 @@ const A={
   'add-ev':()=>openEventSheet(null,S.sel||todayStr()),
   'edit-ev':t=>{const e=S.events.find(x=>x.id===t.dataset.id);if(e&&!S.readOnly)openEventSheet(e)},
   'ctab':t=>{S.ctab=t.dataset.v;S.cq='';const q=$('cq');if(q)q.value='';render()},
+  'more-p':t=>{const k=t.dataset.k;if(OPENP.has(k))OPENP.delete(k);else OPENP.add(k);render()},
   'open-cust':t=>{S.custKey=t.dataset.k;S.site=null;go('customer')},
   'site':t=>{S.site=t.dataset.v;render()},
   'add-contact':t=>openContactSheet(null,{kind:t.dataset.kind||S.ctab,cust:t.dataset.cust||'',site:t.dataset.site||''}),
