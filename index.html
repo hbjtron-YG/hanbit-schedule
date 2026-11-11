@@ -388,7 +388,7 @@ button.ev-row:hover{border-color:var(--line)}
 (function(){
 /* ---------- constants ---------- */
 const CUSTOMERS=[
-  {key:'삼성파운드리',cls:'sf',sites:['기흥','화성','평택']},
+  {key:'삼성',cls:'sf',sites:['기흥','화성','평택']},
   {key:'SK하이닉스',cls:'hx',sites:['이천','청주']},
   {key:'DB하이텍',cls:'db',sites:['부천','상우(음성)']},
   {key:'온세미',cls:'on',sites:['부천']},
@@ -401,7 +401,11 @@ const KEY_AREAS=['기술 지원','부품·수리','교정 접수','영업'];
 const KINDS=[['cust','고객사'],['hanbit','한빛제이트론'],['keysight','키사이트']];
 const REQ_CATS=['기능 요청','오류 신고','기타'];
 const REQ_ST=['접수','검토중','반영 완료'];
-const custOf=k=>CUSTOMERS.find(c=>c.key===k)||CUSTOMERS[4];
+/* 예전 이름으로 저장된 고객사를 지금 이름으로 맞춤 */
+const CUST_ALIAS={'삼성파운드리':'삼성'};
+const normCust=k=>CUST_ALIAS[k]||k;
+const normRec=r=>{if(!r)return r;const o={...r};if(o.customer)o.customer=normCust(o.customer);if(Array.isArray(o.places))o.places=o.places.map(p=>({...p,customer:normCust(p.customer)}));return o};
+const custOf=k=>CUSTOMERS.find(c=>c.key===normCust(k))||CUSTOMERS[4];
 const custByCls=c=>CUSTOMERS.find(x=>x.cls===c);
 
 const P={
@@ -475,7 +479,7 @@ function sampleEvents(){
   return [
     {id:'s1',person:'김현우',start:d(3),end:d(5),customer:'SK하이닉스',site:'이천 M16',equipment:['P9001A'],reason:'연간계약',status:'완료',memo:'예시'},
     {id:'s2',person:'박지은',start:d(10),end:d(10),customer:'DB하이텍',site:'부천',equipment:['E4980A','3458A'],reason:'단건 유상',status:'예정',memo:'예시'},
-    {id:'s3',person:'김현우, 이도윤',start:d(12),end:d(14),customer:'삼성파운드리',site:'화성 S3',equipment:['4082F','81110A'],reason:'연간계약',status:'예정',memo:'예시'},
+    {id:'s3',person:'김현우, 이도윤',start:d(12),end:d(14),customer:'삼성',site:'화성 S3',equipment:['4082F','81110A'],reason:'연간계약',status:'예정',memo:'예시'},
     {id:'s4',person:'이도윤',start:d(18),end:d(18),customer:'온세미',site:'부천',equipment:['53131A','53220A'],reason:'수리 후 재교정',status:'예정',memo:'예시'}
   ];
 }
@@ -1270,8 +1274,8 @@ async function boot(){
   let timer=setTimeout(()=>notice('일정을 아직 불러오지 못했어요. 인터넷 연결을 확인하세요.'),10000);
   const onErr=err=>{clearTimeout(timer);S.loading=false;notice(err&&err.code==='permission-denied'?'데이터를 볼 권한이 없어요. 관리자에게 문의하세요.':'데이터를 불러오지 못했어요. 페이지를 새로고침해 주세요.');render()};
   const docs=snap=>snap.docs.map(d=>({id:d.id,...d.data()}));
-  db.collection('schedules').onSnapshot(snap=>{S.events=docs(snap);S.loading=false;if(!snap.metadata.fromCache){clearTimeout(timer);notice('')}render()},onErr);
-  db.collection('contacts').onSnapshot(snap=>{S.contacts=docs(snap);render()},onErr);
+  db.collection('schedules').onSnapshot(snap=>{S.events=docs(snap).map(normRec);S.loading=false;if(!snap.metadata.fromCache){clearTimeout(timer);notice('')}render()},onErr);
+  db.collection('contacts').onSnapshot(snap=>{S.contacts=docs(snap).map(normRec);render()},onErr);
   db.collection('requests').onSnapshot(snap=>{S.requests=docs(snap);render()},onErr);
   db.collection('customers').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.customers=m;render()},onErr);
   db.doc('settings/org').onSnapshot(snap=>{S.settings=(snap&&snap.data&&snap.data())||{};render()},onErr);
