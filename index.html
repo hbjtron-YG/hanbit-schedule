@@ -468,7 +468,7 @@ const S={
   fCust:store.get('hj.fc')||'전체',fPerson:store.get('hj.fp')||'전체',
   ctab:'cust',cq:'',custKey:null,site:null,
   reqCat:'기능 요청',reqFilter:'전체',
-  me:store.get('hj.me')||'',theme:store.get('hj.theme')||'system'
+  me:store.get('hj.meSet')==='1'?(store.get('hj.me')||''):'', /* 직접 저장한 이름만 사용 (예전에 자동 저장된 이름은 무시) */theme:store.get('hj.theme')||'system'
 };
 let db=null;
 
@@ -888,6 +888,7 @@ function render(){
   if(aid){const el=$(aid);if(el){el.focus({preventScroll:true});try{if(s1!=null)el.setSelectionRange(s1,s2)}catch(e){}}}
   $('peopleList').innerHTML=people().map(p=>`<option value="${esc(p)}">`).join('');
   if(v==='cal')bindSwipe();
+  saveLoc();
 }
 function go(v){S.view=v;render();window.scrollTo(0,0)}
 
@@ -998,7 +999,6 @@ function openEventSheet(ev,date){
     const places=st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
     const data={person,start,end,places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq,work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
-    if(!S.me){S.me=splitP(person)[0];store.set('hj.me',S.me)}
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
@@ -1214,7 +1214,7 @@ const A={
     if(t.dataset.armed!=='1'){t.dataset.armed='1';t.textContent='한 번 더 누르면 삭제';t.classList.add('solid');return}
     try{await dbDel('requests',t.dataset.id);toast('삭제했어요')}catch(err){toast(failMsg(err))}},
   'theme':t=>{S.theme=t.dataset.v;store.set('hj.theme',S.theme);applyTheme();render()},
-  'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);toast(S.me?'저장했어요':'이름을 지웠어요');render()},
+  'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);store.set('hj.meSet','1');toast(S.me?'저장했어요':'이름을 지웠어요');render()},
   'weather':()=>openWeather()
 };
 const stripId=o=>{const {id,...r}=o;return r};
@@ -1237,7 +1237,6 @@ document.addEventListener('submit',async e=>{
   const now=new Date().toISOString();
   try{
     await dbAdd('requests',{cat:S.reqCat,text,author:author||'',status:'접수',reply:'',createdAt:now,updatedAt:now});
-    if(author&&!S.me){S.me=author;store.set('hj.me',author)}
     $('rqText').value='';$('rqErr').textContent='';render();toast('요청을 남겼어요');
   }catch(err){$('rqErr').textContent=failMsg(err)}
 });
@@ -1272,6 +1271,42 @@ async function connectFirebase(){
 }
 
 /* ---------- boot ---------- */
+/* ---------- 새로고침해도 보던 화면 유지 (주소 # 뒤에 기록) ---------- */
+const VIEWS=['today','cal','list','contacts','customer','req','menu'];
+function saveLoc(){
+  const q=new URLSearchParams();q.set('v',S.view);
+  if(S.view==='cal'||S.view==='list'){q.set('ym',S.y+'-'+(S.m+1));if(S.sel&&S.view==='cal')q.set('d',S.sel)}
+  if(S.view==='contacts')q.set('t',S.ctab);
+  if(S.view==='customer'&&S.custKey){q.set('c',S.custKey);if(S.site)q.set('s',S.site)}
+  const h='#'+q.toString();
+  if(location.hash!==h){try{history.replaceState(history.state,'',location.pathname+location.search+h)}catch(e){}}
+}
+(function loadLoc(){
+  try{
+    const q=new URLSearchParams(location.hash.slice(1));const v=q.get('v');
+    if(!VIEWS.includes(v))return;
+    S.view=v;
+    const ym=(q.get('ym')||'').split('-').map(Number);if(ym[0]&&ym[1]){S.y=ym[0];S.m=ym[1]-1}
+    if(/^\d{4}-\d{2}-\d{2}$/.test(q.get('d')||''))S.sel=q.get('d');
+    if(['cust','hanbit','keysight'].includes(q.get('t')))S.ctab=q.get('t');
+    if(v==='customer'){S.custKey=q.get('c');S.site=q.get('s');if(!S.custKey)S.view='contacts'}
+  }catch(e){}
+})();
+
+/* ---------- 뒤로가기: 창 닫기 → 상위 화면 → '한 번 더 누르면 종료' ---------- */
+/* 크롬은 사용자가 화면을 만진 뒤에 넣은 기록만 뒤로가기에 쓰므로, 터치할 때 '막이' 기록을 하나 넣어 둠 */
+let needGuard=true,backArmed=0;
+function pushGuard(){try{history.pushState({hjGuard:1},'',location.href)}catch(e){}needGuard=false}
+['pointerdown','keydown'].forEach(t=>document.addEventListener(t,()=>{if(needGuard)pushGuard()},true));
+window.addEventListener('popstate',()=>{
+  needGuard=true;
+  if(!$('scrim').hidden){closeSheet();return}
+  if(S.view==='customer'){go('contacts');return}
+  if(S.view==='list'){go('cal');return}
+  backArmed=Date.now();toast('한 번 더 누르면 종료돼요');
+  setTimeout(()=>{if(backArmed&&Date.now()-backArmed>=1900)backArmed=0},2000);
+});
+
 render();
 async function boot(){
   /* 관리자 표시: 주소 끝에 ?admin=1 로 한 번 열면 이 기기에 기억됨 (?admin=0 으로 해제). 로그인 붙이기 전 임시 방식 */
