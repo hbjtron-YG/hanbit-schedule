@@ -189,9 +189,10 @@ button.ev-row:hover{border-color:var(--line)}
 .dn{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .cell.today .dn{background:var(--accent);color:var(--accent-fg)}
 .dcount,.addp{display:none}
-.mchip{display:block;height:18px;line-height:18px;border-radius:4px;font-size:11.5px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;background:var(--pc);color:var(--pt)}
-.mchip.done,.pitem.done{opacity:.5}
-.mmore{font-size:11px;font-weight:700;color:var(--muted);text-align:center}
+.pitem.done{opacity:.5}
+.mdots{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;padding:3px 2px 2px}
+.mdots i{width:10px;height:10px;border-radius:50%;background:var(--pc);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .12)}
+.mdots i.done{opacity:.35}
 .wk{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:4px;margin:0 3px 4px;padding:1px 2px}
 .pitems{display:none}
 @media (min-width:760px){
@@ -201,7 +202,7 @@ button.ev-row:hover{border-color:var(--line)}
   .dcount{display:inline;font-size:12px;color:var(--muted)}
   .addp{display:grid;margin-left:auto;width:28px;height:28px;border-radius:7px;place-items:center;color:var(--muted)}
   .hit:hover .addp{background:var(--surface-2);color:var(--accent)}
-  .mchip,.mmore{display:none}
+  .mdots{display:none}
   .cell{min-height:150px}
   .pitems{display:flex;flex-direction:column;gap:5px;padding:0 6px 8px}
   .pitem{display:flex;flex-direction:column;gap:2px;padding:5px 6px;border-radius:7px;background:var(--sunken);border:1px solid transparent;text-align:left;min-width:0;width:100%;color:inherit}
@@ -615,7 +616,6 @@ function vCal(){
       const cls=['cell'];
       if(d.getMonth()!==S.m)cls.push('out');
       if(k===t)cls.push('today');if(k===S.sel&&!isWide())cls.push('sel');
-      const max=ents.length>4?3:4;
       const pi=ents.map(x=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
         return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem${e.status==='완료'?' done':''}">
           <span class="r1"><span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span><span class="pl">${esc(placeOf(e))}</span></span>
@@ -624,8 +624,7 @@ function vCal(){
       cells+=`<div class="${cls.join(' ')}">
         <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${ents.length}명${S.readOnly?'':', 눌러서 일정 추가'}">
           <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${ents.length?ents.length+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
-          ${ents.slice(0,max).map(x=>`<span class="mchip${x.e.status==='완료'?' done':''}" style="${pst(x.p)}">${esc(x.p)}</span>`).join('')}
-          ${ents.length>max?`<span class="mmore">+${ents.length-max}명</span>`:''}
+          ${ents.length?`<span class="mdots" aria-hidden="true">${ents.map(x=>`<i class="${x.e.status==='완료'?'done':''}" style="${pst(x.p)}"></i>`).join('')}</span>`:''}
         </button>
         ${pi?`<div class="pitems">${pi}</div>`:''}
         ${i===4&&wkN?`<span class="wk" title="주말 일정은 목록에서 볼 수 있어요">주말 ${wkN}명</span>`:''}
