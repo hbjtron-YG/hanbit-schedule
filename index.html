@@ -939,7 +939,7 @@ const delBox=(msg)=>`<div class="confirm" data-confirm hidden style="display:fle
 function openEventSheet(ev,date){
   const isEdit=!!ev;
   const names=staff().map(p=>p.name);
-  const given=ev?splitP(ev.person):(S.me?[S.me]:[]);
+  const given=ev?splitP(ev.person):[]; /* 새 일정은 담당자 선택 없이 시작 */
   const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n))};
   const others=given.filter(n=>!names.includes(n)).join(', ');
   const eqAll=[...EQUIP];
