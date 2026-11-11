@@ -189,10 +189,13 @@ button.ev-row:hover{border-color:var(--line)}
 .dn{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
 .cell.today .dn{background:var(--accent);color:var(--accent-fg)}
 .dcount,.addp{display:none}
-.pitem.done{opacity:.5}
+.plist{display:flex;flex-direction:column;gap:10px}
+.plist:empty{display:none}
+.pbox{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.pbox .ph{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hint[aria-pressed="true"]{border-style:solid;border-color:var(--c,var(--accent));background:color-mix(in srgb,var(--c,var(--accent)) 14%,var(--surface));color:var(--fg)}
 .mdots{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;padding:3px 2px 2px}
 .mdots i{width:10px;height:10px;border-radius:50%;background:var(--pc);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .12)}
-.mdots i.done{opacity:.35}
 .wk{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:4px;margin:0 3px 4px;padding:1px 2px}
 .pitems{display:none}
 @media (min-width:760px){
@@ -391,9 +394,8 @@ const CUSTOMERS=[
   {key:'온세미',cls:'on',sites:['부천']},
   {key:'기타',cls:'etc',sites:[]}
 ];
-const EQUIP=['P9001A','4082F','E4980A','E4980B','3458A','81110A','53131A','53220A'];
-const REASONS=['연간계약','단건 유상','보증/무상','수리 후 재교정','긴급 요청','기타'];
-const STATUSES=['예정','진행중','완료'];
+const EQUIP=['P9000','4080','계측기'];
+const MODEL_HINTS=['P9001A','4082F','E4980A','E4980B','3458A','81110A','53131A','53220A'];
 const CUST_ROLES=['출입 담당','장비 담당','구매/계약','기타'];
 const KEY_AREAS=['기술 지원','부품·수리','교정 접수','영업'];
 const KINDS=[['cust','고객사'],['hanbit','한빛제이트론'],['keysight','키사이트']];
@@ -517,18 +519,22 @@ function gateCount(key){
 
 /* ---------- small renderers ---------- */
 const stCls=s=>s==='완료'?'done':s==='진행중'?'ing':'';
-const placeOf=e=>[custName(e),e.site].filter(Boolean).join(' ');
+/* 한 일정에 방문지 여러 곳: places[{customer,customerName,site}] (예전 일정은 customer/site 하나) */
+const placesOf=e=>Array.isArray(e.places)&&e.places.length?e.places:(e.customer?[{customer:e.customer,customerName:e.customerName||'',site:e.site||''}]:[]);
+const pName=p=>p.customer==='기타'?(p.customerName||'기타'):p.customer;
+const placeOf=e=>placesOf(e).map(p=>[pName(p),p.site].filter(Boolean).join(' ')).join(' · ');
+const uniqP=ents=>{const seen=new Set();return ents.filter(x=>!seen.has(x.p)&&seen.add(x.p))};
 function entRow(x,opts){
-  const e=x.e;const st=e.status||'예정';
+  const e=x.e;
   const range=(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
   const tag=S.readOnly?'div':'button';
   const eq=(e.equipment||[]);
-  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${st==='완료'?' done':''}">
+  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row">
     <span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span>
     <span class="body">
-      <span class="l1"><b>${esc(placeOf(e))}</b><span class="st ${stCls(st)}">${esc(st)}</span>${range?`<span class="small muted mono">${range}</span>`:''}</span>
+      <span class="l1"><b>${esc(placeOf(e))}</b>${range?`<span class="small muted mono">${range}</span>`:''}</span>
       ${e.work?`<span class="small" style="color:var(--fg-2)">${esc(e.work)}</span>`:''}
-      ${eq.length||e.reason?`<span class="l3">${eq.map(q=>`<span class="eq">${esc(q)}</span>`).join('')}${e.reason?`<span class="tag">${esc(e.reason)}</span>`:''}</span>`:''}
+      ${eq.length?`<span class="l3">${eq.map(q=>`<span class="eq">${esc(q)}</span>`).join('')}</span>`:''}
       ${opts&&opts.memo&&e.memo?`<span class="memo">${esc(e.memo)}</span>`:''}
     </span>
   </${tag}>`;
@@ -564,14 +570,14 @@ function vToday(){
   for(let i=0;i<5;i++){
     const d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i);const k=ymd(d);
     const es=entriesOn(k,true);
-    week+=`<button type="button" class="wd${k===t?' today':''}" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${es.length}명"><small>${WD[d.getDay()]}</small><b>${d.getDate()}</b><span class="dots">${es.slice(0,4).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span></button>`;
+    week+=`<button type="button" class="wd${k===t?' today':''}" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${uniqP(es).length}명"><small>${WD[d.getDay()]}</small><b>${d.getDate()}</b><span class="dots">${uniqP(es).slice(0,4).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span></button>`;
   }
   return `
   <div class="vh"><div class="grow"><span class="eyebrow">Hanbit Jtron</span><h1>현장 검교정 일정</h1></div><span class="date">${fmtDay(t)}</span></div>
   <div class="today-grid">
     <div>
       <section class="card" aria-labelledby="tdH">
-        <div class="card-h"><h2 id="tdH">오늘의 일정</h2>${ents.length?`<span class="pill">출장 ${ents.length}명</span>`:''}</div>
+        <div class="card-h"><h2 id="tdH">오늘의 일정</h2>${ents.length?`<span class="pill">출장 ${uniqP(ents).length}명</span>`:''}</div>
         ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:
           ents.length?`<div class="evs">${ents.map(x=>entRow(x)).join('')}</div>`:
           `<div class="empty">오늘은 등록된 출장이 없어요.${S.readOnly?'':`<button type="button" class="btn sm" data-act="go" data-v="cal">캘린더에서 일정 추가</button>`}</div>`}
@@ -617,14 +623,14 @@ function vCal(){
       if(d.getMonth()!==S.m)cls.push('out');
       if(k===t)cls.push('today');if(k===S.sel&&!isWide())cls.push('sel');
       const pi=ents.map(x=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
-        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem${e.status==='완료'?' done':''}">
+        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem">
           <span class="r1"><span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span><span class="pl">${esc(placeOf(e))}</span></span>
           ${eq||e.work?`<span class="r2">${eq?`<span class="eqs">${esc(eq)}</span>`:''}${eq&&e.work?' · ':''}${esc(e.work||'')}</span>`:''}
         </${tag}>`}).join('');
       cells+=`<div class="${cls.join(' ')}">
-        <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${ents.length}명${S.readOnly?'':', 눌러서 일정 추가'}">
-          <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${ents.length?ents.length+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
-          ${ents.length?`<span class="mdots" aria-hidden="true">${ents.map(x=>`<i class="${x.e.status==='완료'?'done':''}" style="${pst(x.p)}"></i>`).join('')}</span>`:''}
+        <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${uniqP(ents).length}명${S.readOnly?'':', 눌러서 일정 추가'}">
+          <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${ents.length?uniqP(ents).length+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
+          ${ents.length?`<span class="mdots" aria-hidden="true">${uniqP(ents).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span>`:''}
         </button>
         ${pi?`<div class="pitems">${pi}</div>`:''}
         ${i===4&&wkN?`<span class="wk" title="주말 일정은 목록에서 볼 수 있어요">주말 ${wkN}명</span>`:''}
@@ -634,7 +640,7 @@ function vCal(){
   let panel='';
   if(S.sel){
     const ents=entriesOn(S.sel);
-    panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">출장 ${ents.length}명</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
+    panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">출장 ${uniqP(ents).length}명</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
       (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${ents.map(x=>entRow(x,{memo:true})).join('')}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`);
   }else panel=`<div class="empty">날짜를 누르면 그날 일정과 일정 추가 버튼이 나와요</div>`;
   return `
@@ -719,7 +725,7 @@ function renderContactResults(){
       <section class="grp"><h3>직원 <span>${ppl.length}명</span></h3>
       ${ppl.length?`<div class="list">${ppl.map(c=>{
         const ev=S.events.filter(e=>onDay(e,t)&&splitP(e.person).includes(c.name))[0];
-        const now=ev?`<span class="now c-${custOf(ev.customer).cls}">오늘 ${esc(custName(ev))} ${esc(ev.site||'')}</span>`:`<span class="now">오늘 출장 일정 없음</span>`;
+        const now=ev?`<span class="now c-${custOf(ev.customer).cls}">오늘 ${esc(placeOf(ev))}</span>`:`<span class="now">오늘 출장 일정 없음</span>`;
         return personRow(c,now);
       }).join('')}</div>`:`<div class="empty">${q?'검색 결과가 없어요':'아직 등록된 직원 연락처가 없어요. 오른쪽 위 추가를 눌러 등록하세요.'}</div>`}</section></div>`;
   }else{
@@ -918,42 +924,50 @@ function openEventSheet(ev,date){
   const isEdit=!!ev;
   const names=staff().map(p=>p.name);
   const given=ev?splitP(ev.person):(S.me?[S.me]:[]);
-  const st={cust:ev?ev.customer:'',eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n))};
+  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n))};
   const others=given.filter(n=>!names.includes(n)).join(', ');
-  const eqAll=[...EQUIP];S.events.forEach(e=>(e.equipment||[]).forEach(q=>{if(!eqAll.includes(q))eqAll.push(q)}));
-  st.eq.forEach(q=>{if(!eqAll.includes(q))eqAll.push(q)});
+  const eqAll=[...EQUIP];
+  st.eq.forEach(q=>{if(!eqAll.includes(q))eqAll.push(q)}); /* 예전 일정에 적힌 다른 장비는 그 일정에서만 보임 */
   const d=date||todayStr();
   openSheet(`<form class="sb" id="evF" novalidate>
     <div class="f"><span class="lab">담당자 (여러 명 선택 가능)</span><div class="picks" id="fPeople"></div><input id="fOther" placeholder="그 외 이름 (쉼표로 구분)" autocomplete="off" value="${esc(others)}" aria-label="그 외 담당자 이름"></div>
     <div class="two"><div class="f"><label for="fStart">시작일</label><input type="date" id="fStart" value="${esc(ev?ev.start:d)}"></div><div class="f"><label for="fEnd">종료일</label><input type="date" id="fEnd" value="${esc(ev?(ev.end||ev.start):d)}"></div></div>
-    <div class="f"><span class="lab">고객사</span><div class="picks" id="fCust"></div><input id="fCustName" placeholder="고객사명 입력" value="${esc(ev?ev.customerName||'':'')}" hidden></div>
-    <div class="f"><label for="fSite">사이트 / 장소</label><input id="fSite" list="siteList" placeholder="예: 이천 M16 FAB, 화성 S3 라인" autocomplete="off" value="${esc(ev?ev.site||'':'')}"><div class="picks" id="fSiteHints"></div></div>
-    <div class="f"><span class="lab">장비</span><div class="picks" id="fEq"></div><div class="addeq"><input class="inp" id="fEqNew" placeholder="다른 모델 (예: B1500A)" autocomplete="off" aria-label="다른 장비 모델"><button type="button" class="btn" id="fEqAdd">추가</button></div></div>
+    <div class="f"><span class="lab">방문 고객사 (여러 곳 선택 가능, 누른 순서대로)</span><div class="picks" id="fCust"></div><div class="plist" id="fPlaces"></div></div>
+    <div class="f"><span class="lab">장비</span><div class="picks" id="fEq"></div></div>
     <div class="f"><label for="fWork">작업내용</label><input id="fWork" placeholder="예: 정기 교정 4대, 긴급 수리" autocomplete="off" value="${esc(ev?ev.work||'':'')}"></div>
-    <div class="two"><div class="f"><label for="fReason">사유</label><select id="fReason">${REASONS.map(r=>`<option${ev&&ev.reason===r?' selected':''}>${r}</option>`).join('')}</select></div>
-      <div class="f"><label for="fStatus">상태</label><select id="fStatus">${STATUSES.map(r=>`<option${(ev?ev.status||'예정':'예정')===r?' selected':''}>${r}</option>`).join('')}</select></div></div>
-    <div class="f"><label for="fMemo">메모</label><textarea id="fMemo" rows="3" placeholder="출입 신청, 준비물 등">${esc(ev?ev.memo||'':'')}</textarea></div>
+    <div class="f"><label for="fMemo">메모</label><textarea id="fMemo" rows="3" placeholder="사유, 출입 신청, 준비물 등 자유롭게">${esc(ev?ev.memo||'':'')}</textarea></div>
     <div class="err" id="fErr"></div>
   </form>
   <footer>${isEdit?`<button type="button" class="btn danger" id="fDel">삭제</button>`:`<button type="button" class="btn" data-close>취소</button>`}<button type="button" class="btn primary grow" id="fSave">저장</button>${isEdit?delBox('이 일정을 지울까요? 모든 사람의 달력에서 사라지고 되돌릴 수 없어요.'):''}</footer>`,
   isEdit?'일정 수정':'일정 추가',isEdit?'':`누른 날짜 ${fmtDay(d)}부터 시작`);
+  const syncPl=()=>{
+    document.querySelectorAll('#fPlaces [data-si]').forEach(el=>{const p=st.pl[+el.dataset.si];if(p)p.site=el.value});
+    document.querySelectorAll('#fPlaces [data-cn]').forEach(el=>{const p=st.pl[+el.dataset.cn];if(p)p.customerName=el.value});
+  };
   const picks=()=>{
     $('fPeople').innerHTML=staff().map(p=>`<button type="button" class="pick pp" style="--pc:${p.c[0]};--pt:${p.c[1]}" data-p="${esc(p.name)}" aria-pressed="${st.ppl.includes(p.name)}">${esc(p.name)}</button>`).join('');
     $('fPeople').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const n=b.dataset.p;st.ppl=st.ppl.includes(n)?st.ppl.filter(x=>x!==n):[...st.ppl,n];picks()});
-    $('fCust').innerHTML=CUSTOMERS.map(c=>`<button type="button" class="pick c-${c.cls}" data-c="${esc(c.key)}" aria-pressed="${st.cust===c.key}">${esc(c.key)}</button>`).join('');
-    $('fCust').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{st.cust=b.dataset.c;picks()});
-    $('fCustName').hidden=st.cust!=='기타';
-    const hints=st.cust?custOf(st.cust).sites.concat(sitesOf(st.cust)).filter((v,i,a)=>a.indexOf(v)===i):[];
-    $('fSiteHints').innerHTML=hints.map(s=>`<button type="button" class="hint" data-s="${esc(s)}">${esc(s)}</button>`).join('');
-    $('fSiteHints').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{$('fSite').value=b.dataset.s;$('fSite').focus()});
-    const used=[...new Set(S.events.filter(e=>!st.cust||e.customer===st.cust).map(e=>e.site).filter(Boolean))];
-    $('siteList').innerHTML=used.map(s=>`<option value="${esc(s)}">`).join('');
+    $('fCust').innerHTML=CUSTOMERS.map(c=>`<button type="button" class="pick c-${c.cls}" data-c="${esc(c.key)}" aria-pressed="${st.pl.some(p=>p.customer===c.key)}">${esc(c.key)}</button>`).join('');
+    $('fCust').querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{syncPl();const k=b.dataset.c;
+      if(st.pl.some(p=>p.customer===k))st.pl=st.pl.filter(p=>p.customer!==k);else st.pl.push({customer:k,customerName:'',site:''});picks()});
+    $('fPlaces').innerHTML=st.pl.map((p,i)=>{const c=custOf(p.customer);
+      const hints=c.sites.concat(sitesOf(p.customer)).filter((v,j,a)=>a.indexOf(v)===j);
+      const cur=splitP(p.site);
+      return `<div class="pbox c-${c.cls}">
+        <div class="ph"><b class="cname">${st.pl.length>1?(i+1)+'. ':''}${esc(p.customer)}</b><button type="button" class="btn ghost sm" data-rm="${i}">빼기</button></div>
+        ${p.customer==='기타'?`<input class="inp" data-cn="${i}" placeholder="고객사명 입력" autocomplete="off" value="${esc(p.customerName||'')}" aria-label="고객사명">`:''}
+        <input class="inp" data-si="${i}" list="siteList" placeholder="사이트 (예: 화성 S3, 여러 곳은 쉼표)" autocomplete="off" value="${esc(p.site||'')}" aria-label="${esc(p.customer)} 사이트">
+        ${hints.length?`<div class="picks">${hints.map(h=>`<button type="button" class="hint" data-i="${i}" data-s="${esc(h)}" aria-pressed="${cur.includes(h)}">${esc(h)}</button>`).join('')}</div>`:''}
+      </div>`}).join('');
+    $('fPlaces').querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{syncPl();st.pl.splice(+b.dataset.rm,1);picks()});
+    $('fPlaces').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{syncPl();const p=st.pl[+b.dataset.i];const cur=splitP(p.site);const h=b.dataset.s;
+      p.site=(cur.includes(h)?cur.filter(x=>x!==h):[...cur,h]).join(', ');picks()});
+    const used=[...new Set(S.events.flatMap(e=>placesOf(e).flatMap(p=>splitP(p.site))))];
+    $('siteList').innerHTML=used.map(x=>`<option value="${esc(x)}">`).join('');
     $('fEq').innerHTML=eqAll.map(q=>`<button type="button" class="pick mono" data-q="${esc(q)}" aria-pressed="${st.eq.includes(q)}">${esc(q)}</button>`).join('');
     $('fEq').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.eq=st.eq.includes(q)?st.eq.filter(x=>x!==q):[...st.eq,q];picks()});
   };
   picks();
-  $('fEqAdd').onclick=()=>{const q=$('fEqNew').value.trim().toUpperCase();if(!q)return;if(!eqAll.includes(q))eqAll.push(q);if(!st.eq.includes(q))st.eq.push(q);$('fEqNew').value='';picks()};
-  $('fEqNew').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('fEqAdd').click()}};
   $('fStart').onchange=()=>{if($('fEnd').value<$('fStart').value)$('fEnd').value=$('fStart').value};
   $('evF').onsubmit=e=>{e.preventDefault();$('fSave').click()};
   $('fSave').onclick=async()=>{
@@ -962,10 +976,12 @@ function openEventSheet(ev,date){
     if(!person)return $('fErr').textContent='담당자를 한 명 이상 고르세요.';
     if(!start)return $('fErr').textContent='시작일을 고르세요.';
     if(end<start)return $('fErr').textContent='종료일이 시작일보다 빨라요.';
-    if(!st.cust)return $('fErr').textContent='고객사를 고르세요.';
-    if(st.cust==='기타'&&!$('fCustName').value.trim())return $('fErr').textContent='고객사명을 입력하세요.';
+    syncPl();
+    if(!st.pl.length)return $('fErr').textContent='방문할 고객사를 한 곳 이상 고르세요.';
+    if(st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
+    const places=st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
-    const data={person,start,end,customer:st.cust,customerName:st.cust==='기타'?$('fCustName').value.trim():'',site:$('fSite').value.trim(),equipment:st.eq,work:$('fWork').value.trim(),reason:$('fReason').value,status:$('fStatus').value,memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
+    const data={person,start,end,places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq,work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
     if(!S.me){S.me=splitP(person)[0];store.set('hj.me',S.me)}
     $('fSave').disabled=true;
     try{
@@ -1017,7 +1033,7 @@ function openContactSheet(c,preset){
     const areas=[...KEY_AREAS];if(st.area&&!areas.includes(st.area))areas.push(st.area);
     $('cArea').innerHTML=areas.map(r=>`<button type="button" class="pick" data-v="${esc(r)}" aria-pressed="${st.area===r}">${esc(r)}</button>`).join('');
     $('cArea').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{st.area=b.dataset.v;draw()});
-    const ms=[...EQUIP];st.models.forEach(m=>{if(!ms.includes(m))ms.push(m)});
+    const ms=[...MODEL_HINTS];st.models.forEach(m=>{if(!ms.includes(m))ms.push(m)});
     $('cModels').innerHTML=ms.map(m=>`<button type="button" class="pick mono" data-v="${esc(m)}" aria-pressed="${st.models.includes(m)}">${esc(m)}</button>`).join('');
     $('cModels').querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{const m=b.dataset.v;st.models=st.models.includes(m)?st.models.filter(x=>x!==m):[...st.models,m];draw()});
   };
@@ -1130,7 +1146,7 @@ function openMainSheet(k){
 }
 function openWeather(){
   const t=todayStr();const list=S.events.filter(e=>onDay(e,t));
-  const places=[...new Set(list.map(e=>String(e.site||'').split(/\s+/)[0]||custOf(e.customer).sites[0]).filter(Boolean))];
+  const places=[...new Set(list.flatMap(e=>placesOf(e).map(p=>String(p.site||'').split(/[\s,]+/)[0]||custOf(p.customer).sites[0])).filter(Boolean))];
   const link=p=>`https://search.naver.com/search.naver?query=${encodeURIComponent(p+' 날씨')}`;
   openSheet(`<div class="sb">
     ${places.length?`<span class="small muted">오늘 출장지</span>${places.map(p=>`<a class="wx" href="${link(p)}" target="_blank" rel="noopener">${ic('cloud',22)}<span class="txt"><b>${esc(p)}</b><span class="small muted">네이버 날씨에서 보기</span></span>${ic('ext',18)}</a>`).join('')}`:`<div class="empty">오늘 등록된 출장지가 없어요</div>`}
