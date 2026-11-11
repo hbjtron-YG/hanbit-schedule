@@ -201,7 +201,6 @@ button.ev-row:hover{border-color:var(--line)}
 .hint[aria-pressed="true"]{border-style:solid;border-color:var(--c,var(--accent));background:color-mix(in srgb,var(--c,var(--accent)) 14%,var(--surface));color:var(--fg)}
 .mdots{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;padding:3px 2px 2px}
 .mdots i{width:10px;height:10px;border-radius:50%;background:var(--pc);box-shadow:inset 0 0 0 1px rgb(0 0 0 / .12)}
-.wk{font-size:10.5px;font-weight:700;color:var(--muted);text-align:center;border:1px dashed var(--line);border-radius:4px;margin:0 3px 4px;padding:1px 2px}
 .pitems{display:none}
 @media (min-width:760px){
   .hit{flex:none;min-height:0;padding:6px 8px 4px}
@@ -223,7 +222,6 @@ button.ev-row:hover{border-color:var(--line)}
   .pitems .pgrp{gap:4px}
   .pitems .pgrp.has-more>:first-child{padding-right:40px}
   .pitems .morep{top:4px;right:4px;min-width:32px;height:22px;padding:0 6px;font-size:11.5px}
-  .wk{margin:0 6px 8px}
 }
 .daypanel{display:flex;flex-direction:column;gap:10px}
 @media (min-width:760px){.daypanel{display:none}}
@@ -516,6 +514,7 @@ function visible(e){
 /* one entry per person per event, rank order */
 function entriesOn(day,all){
   const out=[];
+  {const wd=parse(day).getDay();if(wd===0||wd===6)return out;} /* 주말은 근무하지 않음: 여러 날 일정도 토·일은 비움 */
   S.events.forEach(e=>{if(!onDay(e,day))return;splitP(e.person).forEach(p=>{if(all||S.fPerson==='전체'||S.fPerson===p)out.push({e,p})})});
   return out.sort((a,b)=>(rankOf(a.p)-rankOf(b.p))||a.p.localeCompare(b.p,'ko'));
 }
@@ -635,9 +634,6 @@ function vCal(){
   const weeks=monthWeeks(S.y,S.m);
   let cells='';
   weeks.forEach(row=>{
-    const sat=ymd(new Date(row[4].getFullYear(),row[4].getMonth(),row[4].getDate()+1));
-    const sun=ymd(new Date(row[4].getFullYear(),row[4].getMonth(),row[4].getDate()+2));
-    const wkN=entriesOn(sat).length+entriesOn(sun).length;
     row.forEach((d,i)=>{
       const k=ymd(d);const ents=entriesOn(k);
       const cls=['cell'];
@@ -654,7 +650,6 @@ function vCal(){
           ${ents.length?`<span class="mdots" aria-hidden="true">${uniqP(ents).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span>`:''}
         </button>
         ${pi?`<div class="pitems">${pi}</div>`:''}
-        ${i===4&&wkN?`<span class="wk" title="주말 일정은 목록에서 볼 수 있어요">주말 ${wkN}명</span>`:''}
       </div>`;
     });
   });
