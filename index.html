@@ -900,14 +900,17 @@ function bindSwipe(){
 function shiftMonth(n){const d=new Date(S.y,S.m+n,1);S.y=d.getFullYear();S.m=d.getMonth();if(S.view==='cal')S.sel=null;render()}
 
 /* ---------- sheet ---------- */
-let sheetClose=null;
+let sheetClose=null,sheetScroll=0;
+try{history.scrollRestoration='manual'}catch(e){}
 function openSheet(html,title,sub){
+  if($('scrim').hidden)sheetScroll=window.scrollY;
   $('sheet').innerHTML=`<div class="grab" aria-hidden="true"><i></i></div><header><div class="grow"><h2 id="shT">${title}</h2>${sub?`<span class="small muted">${sub}</span>`:''}</div><button type="button" class="ib flat" data-close aria-label="닫기">${ic('x')}</button></header>${html}`;
   $('sheet').setAttribute('aria-labelledby','shT');
   $('scrim').hidden=false;document.body.style.overflow='hidden';
   $('sheet').querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheet);
 }
-function closeSheet(){$('scrim').hidden=true;$('sheet').innerHTML='';document.body.style.overflow='';sheetClose=null}
+/* 창을 닫으면 열기 전 화면 위치로 돌아감 (선택한 날짜·아래 일정 목록 그대로) */
+function closeSheet(){const y=sheetScroll;$('scrim').hidden=true;$('sheet').innerHTML='';document.body.style.overflow='';sheetClose=null;requestAnimationFrame(()=>window.scrollTo(0,y))}
 $('scrim').addEventListener('click',e=>{if(e.target===$('scrim'))closeSheet()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('scrim').hidden)closeSheet()});
 
@@ -997,7 +1000,9 @@ function openEventSheet(ev,date){
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
-      const sd=parse(start);S.sel=(sd.getDay()===0||sd.getDay()===6)?null:start;S.y=sd.getFullYear();S.m=sd.getMonth();
+      /* 보고 있던 날짜가 이 일정 기간 안이면 그 날짜를 그대로 유지, 아니면 시작일로 이동 */
+      const keep=S.sel&&S.sel>=start&&S.sel<=end;
+      const sd=parse(keep?S.sel:start);S.sel=keep?S.sel:((sd.getDay()===0||sd.getDay()===6)?null:start);S.y=sd.getFullYear();S.m=sd.getMonth();
       closeSheet();render();toast(isEdit?'수정했어요':'저장했어요');
     }catch(err){$('fErr').textContent=failMsg(err);if($('fSave'))$('fSave').disabled=false}
   };
@@ -1295,10 +1300,10 @@ function pushGuard(){try{history.pushState({hjGuard:1},'',location.href)}catch(e
 ['pointerdown','keydown'].forEach(t=>document.addEventListener(t,()=>{if(needGuard)pushGuard()},true));
 window.addEventListener('popstate',()=>{
   needGuard=true;
-  if(!$('scrim').hidden){closeSheet();return}
+  if(!$('scrim').hidden){closeSheet();saveLoc();return}
   if(S.view==='customer'){go('contacts');return}
   if(S.view==='list'){go('cal');return}
-  backArmed=Date.now();toast('한 번 더 누르면 종료돼요');
+  saveLoc();backArmed=Date.now();toast('한 번 더 누르면 종료돼요');
   setTimeout(()=>{if(backArmed&&Date.now()-backArmed>=1900)backArmed=0},2000);
 });
 
