@@ -943,14 +943,11 @@ function openEventSheet(ev,date){
   const given=ev?splitP(ev.person):[]; /* 새 일정은 담당자 선택 없이 시작 */
   const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n))};
   const others=given.filter(n=>!names.includes(n)).join(', ');
-  const eqAll=[...EQUIP];
-  st.eq.forEach(q=>{if(!eqAll.includes(q))eqAll.push(q)}); /* 예전 일정에 적힌 다른 장비는 그 일정에서만 보임 */
   const d=date||todayStr();
   openSheet(`<form class="sb" id="evF" novalidate>
     <div class="f"><span class="lab">담당자 (여러 명 선택 가능)</span><div class="picks" id="fPeople"></div><input id="fOther" placeholder="그 외 이름 (쉼표로 구분)" autocomplete="off" value="${esc(others)}" aria-label="그 외 담당자 이름"></div>
     <div class="two"><div class="f"><label for="fStart">시작일</label><input type="date" id="fStart" value="${esc(ev?ev.start:d)}"></div><div class="f"><label for="fEnd">종료일</label><input type="date" id="fEnd" value="${esc(ev?(ev.end||ev.start):d)}"></div></div>
     <div class="f"><span class="lab">방문 고객사 (여러 곳 선택 가능, 누른 순서대로)</span><div class="picks" id="fCust"></div><div class="plist" id="fPlaces"></div></div>
-    <div class="f"><span class="lab">장비</span><div class="picks" id="fEq"></div></div>
     <div class="f"><label for="fWork">작업내용</label><input id="fWork" placeholder="예: 정기 교정 4대, 긴급 수리" autocomplete="off" value="${esc(ev?ev.work||'':'')}"></div>
     <div class="f"><label for="fMemo">메모</label><textarea id="fMemo" rows="3" placeholder="사유, 출입 신청, 준비물 등 자유롭게">${esc(ev?ev.memo||'':'')}</textarea></div>
     <div class="err" id="fErr"></div>
@@ -981,8 +978,6 @@ function openEventSheet(ev,date){
       p.site=(cur.includes(h)?cur.filter(x=>x!==h):[...cur,h]).join(', ');picks()});
     const used=[...new Set(S.events.flatMap(e=>placesOf(e).flatMap(p=>splitP(p.site))))];
     $('siteList').innerHTML=used.map(x=>`<option value="${esc(x)}">`).join('');
-    $('fEq').innerHTML=eqAll.map(q=>`<button type="button" class="pick mono" data-q="${esc(q)}" aria-pressed="${st.eq.includes(q)}">${esc(q)}</button>`).join('');
-    $('fEq').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{const q=b.dataset.q;st.eq=st.eq.includes(q)?st.eq.filter(x=>x!==q):[...st.eq,q];picks()});
   };
   picks();
   $('fStart').onchange=()=>{if($('fEnd').value<$('fStart').value)$('fEnd').value=$('fStart').value};
@@ -998,7 +993,7 @@ function openEventSheet(ev,date){
     if(st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
     const places=st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
-    const data={person,start,end,places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq,work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
+    const data={person,start,end,places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
