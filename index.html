@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.1.0">
+<meta name="app-version" content="1.1.1">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -387,6 +387,12 @@ button.ev-row:hover{border-color:var(--line)}
 .lad-row{display:grid}
 .lad-name{margin:0 3px;min-height:42px;border-radius:9px;border:2px solid var(--pc);background:var(--surface);color:var(--fg);font-weight:700;font-size:13px;padding:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lad-name.done{background:var(--pc);color:var(--pt)}
+.lad-name{display:flex;align-items:center;justify-content:center}
+.lad-board.tight .lad-name{margin:0 2px;font-size:11.5px;letter-spacing:-.02em;border-width:2px}
+.lad-board.tight .lad-slot{margin:0 2px;font-size:11px}
+.lad-btns{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.lad-btns .gbig{width:100%}
+.lad-cnt{font-family:var(--mono);font-size:13px;opacity:.8;margin-left:4px}
 .lad-svg{display:block}
 .lad-v{stroke:var(--faint);stroke-width:3;stroke-linecap:round}
 .lad-p{fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:0;opacity:.9}
@@ -1013,8 +1019,8 @@ function vLadder(){
   const head=`<div class="vh"><button type="button" class="ib flat" data-act="go" data-v="coffee" aria-label="커피내기로">${ic('back')}</button><div class="grow"><h1>사다리타기</h1></div></div>`;
   if(!L.game)ladNew();
   const G=L.game,n=G.n;
-  const avail=Math.min(isWide()?window.innerWidth-232-64:window.innerWidth-32,760)-28;
-  const cw=Math.max(54,Math.min(110,Math.floor(avail/n)));
+  const avail=Math.min(isWide()?window.innerWidth-232-64:window.innerWidth-32,760)-34;
+  const cw=Math.max(40,Math.min(110,Math.floor(avail/n)));
   const W=n*cw,rowH=26,top=10,H=top*2+rowH*(LAD_ROWS+1);
   const X=c=>c*cw+cw/2,Y=r=>r<0?0:r>=LAD_ROWS?H:top+rowH*(r+1);
   let svg=`<svg class="lad-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
@@ -1031,7 +1037,7 @@ function vLadder(){
   const endOf=[...Array(n).keys()].map(i=>ladTrace(G,i).end);
   const revealed=new Set((G.all?[...Array(n).keys()]:G.shown).filter(i=>L.anim!==i).map(i=>endOf[i]));
   const tops=[...Array(n).keys()].map(i=>{const c=ladColor(G,i);const done=G.all||G.shown.includes(i);
-    return `<button type="button" class="lad-name${done?' done':''}" style="--pc:${c[0]};--pt:${c[1]}" data-act="lad-run" data-i="${i}" aria-label="${esc(G.names[i])} 사다리 타기">${esc(G.names[i])}</button>`}).join('');
+    return `<span class="lad-name${done?' done':''}" style="--pc:${c[0]};--pt:${c[1]}">${esc(G.names[i])}</span>`}).join('');
   const bots=[...Array(n).keys()].map(e=>{
     if(!revealed.has(e))return `<span class="lad-slot hide" aria-label="아직 안 열림">?</span>`;
     return G.prize[e]?`<span class="lad-slot win">${ic('cup',16)}커피</span>`:`<span class="lad-slot pass">통과</span>`;
@@ -1045,13 +1051,14 @@ function vLadder(){
       <div class="card-h"><h2>${n}명 중 ${G.k}명 커피</h2>
         <button type="button" class="btn sm" data-act="lad-again">${ic('ladder',16)}새 사다리</button>
         <button type="button" class="btn sm" data-act="lad-edit">인원·이름 바꾸기</button></div>
-      <p class="small muted" style="margin:0">위 이름을 누르면 한 명씩 내려가요.</p>
-      <div class="lad-wrap"><div class="lad-board" style="width:${W}px">
+      <p class="small muted" style="margin:0">아래 버튼을 누를 때마다 왼쪽부터 한 명씩 내려가요.</p>
+      <div class="lad-wrap"><div class="lad-board${cw<52?' tight':''}" style="width:${W}px">
         <div class="lad-row" ${grid}>${tops}</div>
         ${svg}
         <div class="lad-row" ${grid}>${bots}</div>
       </div></div>
-      ${G.all?'':`<button type="button" class="btn" data-act="lad-all">전체 결과 한 번에 보기</button>`}
+      ${(()=>{const nx=G.all?-1:[...Array(n).keys()].find(i=>!G.shown.includes(i));return nx==null||nx<0?'':`<div class="lad-btns"><button type="button" class="btn primary gbig" data-act="lad-run" data-i="${nx}">${ic('next',18)}${esc(G.names[nx])} 내려가기 <span class="lad-cnt">${G.shown.length+1}/${n}</span></button>
+        <button type="button" class="btn" data-act="lad-all">전체 결과 한 번에 보기</button></div>`})()}
     </section>
     ${allWin?`<section class="card lad-result" role="status"><span class="lad-cup">${ic('cup',28)}</span><div><b>${winners.map(esc).join(', ')}</b><span>님이 커피를 사요!</span></div></section>`:''}
     ${results.length?`<section class="card"><div class="card-h"><h2>결과</h2></div><div class="lad-res">${results.map(x=>{const c=ladColor(G,x.i);return `<span class="lad-r${x.win?' win':''}"><span class="pchip" style="--pc:${c[0]};--pt:${c[1]}">${esc(G.names[x.i])}</span>${x.win?'커피':'통과'}</span>`}).join('')}</div></section>`:''}
@@ -1059,7 +1066,7 @@ function vLadder(){
 }
 /* ---------- 커피내기: 공통 ---------- */
 const GAMES=[
-  {id:'ladder',name:'사다리타기',desc:'이름을 누르면 한 명씩 내려가요',ic:'ladder'},
+  {id:'ladder',name:'사다리타기',desc:'버튼을 누를 때마다 한 명씩 내려가요',ic:'ladder'},
   {id:'roulette',name:'돌림판',desc:'돌림판을 돌려 커피 살 사람을 뽑아요',ic:'wheel'},
   {id:'snail',name:'달팽이 경주',desc:'늦게 들어온 달팽이가 커피를 사요',ic:'snail'},
   {id:'marble',name:'구슬 떨어뜨리기',desc:'형광 구슬이 장애물을 지나 떨어져요. 마지막이 커피',ic:'marble'},
