@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.0.1">
+<meta name="app-version" content="1.0.2">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'">
 <style>
-/* 시작 화면: 회사 로고 약 1초 + 오른쪽 아래 버전. 홈 화면 앱의 시스템 시작 화면(흰 배경 + 아이콘)과 이어지도록 항상 흰 배경 */
+/* 시작 화면: 회사 로고 약 2초 + 오른쪽 아래 버전. 홈 화면 앱의 시스템 시작 화면(흰 배경 + 아이콘)과 이어지도록 항상 흰 배경 */
 #splash{position:fixed;inset:0;z-index:100;background:#FFFFFF;display:grid;place-items:center;transition:opacity .25s ease}
 #splash img{width:min(72vw,340px);height:auto;max-width:100%}
 #splash .ver{position:absolute;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));font:600 12px/1 "IBM Plex Mono",ui-monospace,Menlo,monospace;color:#5D6878;letter-spacing:.02em}
@@ -395,8 +395,8 @@ button.ev-row:hover{border-color:var(--line)}
   var v=document.querySelector('meta[name="app-version"]').content;
   document.getElementById('splashVer').textContent='Rev.'+v;
   var t0=(window.performance&&performance.now)?performance.now():0;
-  /* 페이지가 열린 뒤 약 1초 보여 주고 사라짐 */
-  setTimeout(function(){var el=document.getElementById('splash');if(!el)return;el.classList.add('out');setTimeout(function(){el.remove()},300)},Math.max(0,1000-t0));
+  /* 페이지가 열린 뒤 약 2초 보여 주고 사라짐 */
+  setTimeout(function(){var el=document.getElementById('splash');if(!el)return;el.classList.add('out');setTimeout(function(){el.remove()},300)},Math.max(0,2000-t0));
 })();
 </script>
 
