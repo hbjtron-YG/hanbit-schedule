@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.1.1">
+<meta name="app-version" content="1.1.2">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -456,6 +456,12 @@ button.ev-row:hover{border-color:var(--line)}
 .dcard.rest .front{opacity:.6}
 @media (prefers-reduced-motion:reduce){.dcard .back,.dcard .front{transition:none}}
 @media (max-width:359px){.lane{grid-template-columns:60px minmax(0,1fr) 40px}}
+.lad-cntn{font-weight:600;color:var(--accent);font-size:14px;margin-left:4px}
+.lad-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,96px),1fr));gap:8px}
+.lpk{position:relative;min-height:48px;border-radius:12px;border:2px dashed var(--line);background:var(--sunken);color:var(--muted);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:4px;padding:0 6px;white-space:nowrap;overflow:hidden}
+.lpk.on{border:2px solid var(--pc);background:var(--pc);color:var(--pt)}
+.lpk-x{position:absolute;top:2px;right:4px;font-size:9.5px;font-weight:600;opacity:.75}
+.cf-game:disabled{opacity:.45;cursor:default}
 /* small phones */
 @media (max-width:359px){
   body{font-size:14px}
@@ -547,6 +553,7 @@ const P={
   search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   minus:'<path d="M5 12h14"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   ladder:'<path d="M7 3v18M17 3v18M7 7.5h10M7 12h10M7 16.5h10"/>',
   wheel:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/>',
   snail:'<path d="M2 19h14a5 5 0 0 0 5-5V9"/><circle cx="10" cy="13" r="5"/><path d="M10 13a1.8 1.8 0 1 1 1.8-1.8"/><path d="M21 9l-1-4M21 9l2-3"/>',
@@ -967,16 +974,21 @@ function staffEditor(){
 }
 /* ---------- 커피 사다리타기 (이 기기에서만 진행, 저장소에 안 남김) ---------- */
 const LAD_MIN=2,LAD_MAX=12,LAD_ROWS=14;
+/* 참가자: 이름 상자를 눌러 넣고 빼기. names = 고른 사람(직원 순서 → 직접 추가한 사람), extra = 직접 추가한 이름 */
 function ladInit(){
   if(S.lad)return S.lad;
   let saved=null;try{saved=JSON.parse(store.get('hj.lad')||'null')}catch(e){}
-  const n=Math.min(LAD_MAX,Math.max(LAD_MIN,(saved&&saved.n)||Math.min(LAD_MAX,Math.max(LAD_MIN,staff().length))));
-  const k=Math.min(n-1,Math.max(1,(saved&&saved.k)||1));
-  const names=((saved&&saved.names)||staff().map(p=>p.name)).slice(0,LAD_MAX);
-  S.lad={n,k,names,game:null,anim:null};
+  let names=saved&&Array.isArray(saved.sel)?saved.sel:saved&&saved.names?saved.names.slice(0,saved.n||saved.names.length):staff().map(p=>p.name);
+  names=names.map(x=>String(x||'').trim()).filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).slice(0,LAD_MAX);
+  const staffNames=staff().map(p=>p.name);
+  const extra=((saved&&saved.extra)||names.filter(x=>!staffNames.includes(x))).filter(Boolean).slice(0,LAD_MAX);
+  S.lad={names,extra,n:names.length,k:1,game:null,anim:null};
+  S.lad.k=Math.min(Math.max(1,S.lad.n-1),Math.max(1,(saved&&saved.k)||1));
   return S.lad;
 }
-function ladSave(){const L=S.lad;store.set('hj.lad',JSON.stringify({n:L.n,k:L.k,names:L.names}))}
+function ladPool(){const L=ladInit();const st=staff().map(p=>p.name);return st.concat(L.extra.filter(x=>!st.includes(x)))}
+function ladSort(){const L=S.lad;const pool=ladPool();L.names=pool.filter(x=>L.names.includes(x)).slice(0,LAD_MAX);L.n=L.names.length;L.k=Math.min(Math.max(1,L.n-1),Math.max(1,L.k))}
+function ladSave(){const L=S.lad;store.set('hj.lad',JSON.stringify({sel:L.names,extra:L.extra,k:L.k}))}
 function ladName(i){const L=S.lad;return String(L.names[i]||'').trim()||('참가자 '+(i+1))}
 function rnd(max){/* 0 이상 max 미만, 고른 난수 */
   try{const a=new Uint32Array(1);const lim=Math.floor(4294967296/max)*max;let x;do{crypto.getRandomValues(a);x=a[0]}while(x>=lim);return x%max}catch(e){return Math.floor(Math.random()*max)}
@@ -1076,24 +1088,27 @@ const NEON=['#00F5FF','#FF2BD6','#B6FF00','#FFF200','#FF7A00','#39FF14','#A855F7
 function pColor(nm,i){const p=staff().find(x=>x.name===nm);return p?p.c:(PALETTE[i%PALETTE.length]||OTHER_C)}
 function coffeePlayers(){const L=ladInit();return [...Array(L.n).keys()].map(i=>({nm:ladName(i),i}))}
 function vCoffee(){
-  const L=ladInit();
-  return `<div class="vh"><div class="grow"><h1>커피내기</h1><span class="small muted">인원을 정하고 게임을 골라요</span></div></div>
+  const L=ladInit();const pool=ladPool();const ok=L.n>=LAD_MIN;
+  return `<div class="vh"><div class="grow"><h1>커피내기</h1><span class="small muted">참가자를 고르고 게임을 골라요</span></div></div>
   <div class="cf-grid">
     <div class="cf-col">
-      <section class="card" aria-label="인원 정하기">
-        ${ladStepper('lad-n','참가 인원',L.n,LAD_MIN,LAD_MAX)}
-        ${ladStepper('lad-k','커피 사는 사람',L.k,1,L.n-1)}
-        <p class="small muted" style="margin:0">${L.n}명 중 ${L.k}명이 커피를 사요. 다섯 게임 모두 이 설정을 써요.</p>
-      </section>
       <section class="card" aria-labelledby="ladNmH">
-        <div class="card-h"><h2 id="ladNmH">참가자 이름</h2><button type="button" class="btn ghost sm" data-act="lad-fill">직원 명단으로 채우기</button></div>
-        <div class="lad-names">${[...Array(L.n).keys()].map(i=>`<input class="inp" id="lad-n-${i}" value="${esc(L.names[i]||'')}" placeholder="참가자 ${i+1}" autocomplete="off" aria-label="${i+1}번째 참가자 이름">`).join('')}</div>
-        <p class="small muted" style="margin:0">이름을 비워 두면 "참가자 번호"로 나와요. 이 기기에만 기억돼요.</p>
+        <div class="card-h"><h2 id="ladNmH">참가자 <span class="lad-cntn">${L.n}명</span></h2>
+          <button type="button" class="btn ghost sm" data-act="lad-every">${L.n===Math.min(pool.length,LAD_MAX)?'모두 빼기':'모두 넣기'}</button></div>
+        <p class="small muted" style="margin:0">이름을 누르면 참가, 한 번 더 누르면 빠져요.</p>
+        <div class="lad-pick">${pool.map((nm,i)=>{const on=L.names.includes(nm);const c=pColor(nm,i);const ex=L.extra.includes(nm)&&!staff().some(p=>p.name===nm);
+          return `<button type="button" class="lpk${on?' on':''}" style="--pc:${c[0]};--pt:${c[1]}" data-act="lad-tog" data-nm="${esc(nm)}" aria-pressed="${on}">${on?ic('check',16):''}${esc(nm)}${ex?'<span class="lpk-x">직접</span>':''}</button>`}).join('')}</div>
+        <div class="addeq"><input class="inp" id="ladNew" placeholder="다른 사람 이름" autocomplete="off" aria-label="다른 사람 이름" maxlength="10"><button type="button" class="btn" data-act="lad-add">추가</button></div>
+        <p class="small muted" style="margin:0">직접 추가한 사람은 한 번 더 누르면 목록에서 지워져요. 참가자는 이 기기에 기억돼요.</p>
+      </section>
+      <section class="card" aria-label="커피 사는 사람 수">
+        ${ladStepper('lad-k','커피 사는 사람',L.k,1,Math.max(1,L.n-1))}
+        <p class="small muted" style="margin:0">${ok?`${L.n}명 중 ${L.k}명이 커피를 사요. 다섯 게임 모두 이 설정을 써요.`:'참가자를 2명 이상 골라 주세요.'}</p>
       </section>
     </div>
     <section class="cf-col" aria-labelledby="gmH">
       <div class="sec-h"><h2 id="gmH">게임 고르기</h2></div>
-      <div class="cf-games">${GAMES.map(g=>`<button type="button" class="cf-game g-${g.id}" data-act="play" data-g="${g.id}">
+      <div class="cf-games">${GAMES.map(g=>`<button type="button" class="cf-game g-${g.id}" data-act="play" data-g="${g.id}" ${ok?'':'disabled'}>
         <span class="cf-ic">${ic(g.ic,26)}</span><span class="txt"><b>${g.name}</b><span class="small muted">${g.desc}</span></span>${ic('next',18)}</button>`).join('')}</div>
     </section>
   </div>`;
@@ -1674,11 +1689,19 @@ const A={
   'theme':t=>{S.theme=t.dataset.v;store.set('hj.theme',S.theme);applyTheme();render()},
   'lad-n':t=>{const L=ladInit();L.n=Math.min(LAD_MAX,Math.max(LAD_MIN,L.n+Number(t.dataset.n)));L.k=Math.min(L.k,L.n-1);ladSave();render()},
   'lad-k':t=>{const L=ladInit();L.k=Math.min(L.n-1,Math.max(1,L.k+Number(t.dataset.n)));ladSave();render()},
-  'lad-fill':()=>{const L=ladInit();L.names=staff().map(p=>p.name).slice(0,LAD_MAX);ladSave();render()},
+  'lad-fill':()=>{const L=ladInit();L.names=staff().map(p=>p.name).slice(0,LAD_MAX);ladSort();ladSave();render()},
+  'lad-tog':t=>{const L=ladInit();const nm=t.dataset.nm;const isStaff=staff().some(p=>p.name===nm);
+    if(L.names.includes(nm)){L.names=L.names.filter(x=>x!==nm);if(!isStaff)L.extra=L.extra.filter(x=>x!==nm)}
+    else{if(L.names.length>=LAD_MAX){toast('최대 '+LAD_MAX+'명까지 참가할 수 있어요');return}L.names.push(nm)}
+    ladSort();ladSave();render()},
+  'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
+  'lad-add':()=>{const L=ladInit();const el=$('ladNew');const nm=(el&&el.value||'').trim().slice(0,10);if(!nm){if(el)el.focus();return}
+    if(L.names.includes(nm)){toast('이미 참가 중이에요');return}if(L.names.length>=LAD_MAX){toast('최대 '+LAD_MAX+'명까지 참가할 수 있어요');return}
+    if(!ladPool().includes(nm))L.extra.push(nm);L.names.push(nm);ladSort();ladSave();render();const n2=$('ladNew');if(n2){n2.value='';n2.focus()}},
   'lad-start':()=>{ladInit();ladSave();ladNew();render();window.scrollTo(0,0)},
   'lad-again':()=>{ladNew();render()},
   'lad-edit':()=>{S.lad.game=null;S.lad.anim=null;go('coffee')},
-  'play':t=>{const g=t.dataset.g;ladInit();ladSave();if(g==='ladder'){ladNew();go('ladder');return}S.game=g;go('play')},
+  'play':t=>{const g=t.dataset.g;const L0=ladInit();if(L0.n<LAD_MIN){toast('참가자를 2명 이상 골라 주세요');return}ladSave();if(g==='ladder'){ladNew();go('ladder');return}S.game=g;go('play')},
   'g-again':()=>{mountGame();window.scrollTo(0,0)},
   'lad-run':t=>{const L=S.lad,G=L&&L.game;if(!G)return;const i=Number(t.dataset.i);if(!G.all&&!G.shown.includes(i))G.shown.push(i);L.anim=i;render();
     const ms=matchMedia('(prefers-reduced-motion:reduce)').matches?0:1500;clearTimeout(L.timer);L.timer=setTimeout(()=>{if(S.lad.anim===i){S.lad.anim=null;if(S.view==='ladder')render()}},ms)},
@@ -1691,6 +1714,7 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('[data-act]');if(!t||t.closest('#sheet'))return;
   const f=A[t.dataset.act];if(f){e.preventDefault();f(t,e)}
 });
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='ladNew'){e.preventDefault();A['lad-add']()}});
 document.addEventListener('input',e=>{
   if(e.target.id==='cq'){S.cq=e.target.value;renderContactResults()}
   const lm=/^lad-n-(\d+)$/.exec(e.target.id||'');
