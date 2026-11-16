@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.2.0">
+<meta name="app-version" content="1.3.0">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -465,6 +465,9 @@ button.ev-row:hover{border-color:var(--line)}
 .rpt-week{display:flex;align-items:center;gap:8px}
 .rpt-week .txt{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center}
 .rpt-week b{font-size:16px}
+.rpt-send{display:flex;gap:8px;flex-wrap:wrap}
+.rpt-send .btn{flex:1 1 200px;height:50px}
+@media (max-width:759px){.rpt-eml{display:none}}
 .rpt-h{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .rpt-h label{font-size:12.5px;font-weight:600;color:var(--muted)}
 #rpBody{font-family:var(--font);font-size:14px;line-height:1.55;min-height:300px;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -559,6 +562,7 @@ const P={
   search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   minus:'<path d="M5 12h14"/>',
+  down:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   ladder:'<path d="M7 3v18M17 3v18M7 7.5h10M7 12h10M7 16.5h10"/>',
@@ -1458,8 +1462,12 @@ function openReport(){
   openSheet(`<div class="sb">
     <div class="rpt-week"><button type="button" class="ib" id="rpPrev" aria-label="지난 주">${ic('back')}</button><div class="txt"><b id="rpWk"></b><span class="small muted" id="rpRange"></span></div><button type="button" class="ib" id="rpNext" aria-label="다음 주">${ic('next')}</button></div>
     <div class="f"><span class="lab">넣을 사람 (누르면 넣고 빼기)</span><div class="picks" id="rpPpl"></div></div>
+    <div class="two"><div class="f"><label for="rpTo">받는 사람</label><input id="rpTo" inputmode="email" autocomplete="off" placeholder="a@회사.com, b@회사.com"></div>
+      <div class="f"><label for="rpCc">참조 (선택)</label><input id="rpCc" inputmode="email" autocomplete="off" placeholder="쉼표로 여러 명"></div></div>
     <div class="f"><div class="rpt-h"><label for="rpTitle">메일 제목</label><button type="button" class="btn sm" id="rpCopyT">${ic('copy',16)}제목 복사</button></div><input id="rpTitle" readonly></div>
     <div class="f"><div class="rpt-h"><label for="rpBody">메일 내용</label><button type="button" class="btn sm primary" id="rpCopyB">${ic('copy',16)}내용 복사</button></div><textarea id="rpBody" rows="16" spellcheck="false"></textarea></div>
+    <div class="rpt-send"><button type="button" class="btn primary" id="rpMail">${ic('mail',18)}메일 앱으로 보내기</button><button type="button" class="btn rpt-eml" id="rpEml">${ic('down',18)}아웃룩 파일로 받기 (.eml)</button></div>
+    <p class="small muted" style="margin:0">「메일 앱으로 보내기」는 메일 앱(PC는 아웃룩, 휴대폰은 하이웍스·아웃룩 앱 중 선택)을 받는 사람·제목이 채워진 채로 열어요. 내용이 길면 내용은 복사해 두니 본문에 붙여 넣기(Ctrl+V) 하세요. PC의 「아웃룩 파일로 받기」는 내용까지 모두 들어간 새 메일 파일이라, 받은 파일을 열면 아웃룩에서 바로 보낼 수 있어요. 받는 사람·참조는 이 기기에 기억돼요.</p>
     <p class="small muted" style="margin:0">지난주(월~금)와 이번주(월~금) 캘린더 일정을 사람별로 모았어요. 괄호 안 이름은 일정의 「고객 담당자」 칸에서 가져와요. 복사 전에 내용 칸에서 바로 고쳐도 돼요.</p>
   </div>`,'월요일 미팅 안건','캘린더 일정으로 메일 내용을 만들어요');
   const draw=()=>{
@@ -1475,6 +1483,34 @@ function openReport(){
   const cp=async(el,label)=>{const t=el.value;try{await navigator.clipboard.writeText(t);toast(label+' 복사했어요')}catch(e){try{el.removeAttribute('readonly');el.focus();el.select();const ok=document.execCommand('copy');if($('rpTitle')===el)el.setAttribute('readonly','');toast(ok?label+' 복사했어요':'내용을 길게 눌러 복사하세요')}catch(e2){toast('내용을 길게 눌러 복사하세요')}}};
   $('rpCopyT').onclick=()=>cp($('rpTitle'),'제목을');
   $('rpCopyB').onclick=()=>cp($('rpBody'),'내용을');
+  /* 받는 사람·참조: 이 기기에 기억 */
+  $('rpTo').value=store.get('hj.rptTo')||'';$('rpCc').value=store.get('hj.rptCc')||'';
+  $('rpTo').oninput=()=>store.set('hj.rptTo',$('rpTo').value);$('rpCc').oninput=()=>store.set('hj.rptCc',$('rpCc').value);
+  const addrs=v=>String(v||'').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);
+  const okAddr=a=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a);
+  const check=()=>{const to=addrs($('rpTo').value),cc=addrs($('rpCc').value);const bad=to.concat(cc).filter(a=>!okAddr(a));
+    if(!to.length){toast('받는 사람 메일 주소를 적어 주세요');$('rpTo').focus();return null}
+    if(bad.length){toast('메일 주소를 확인해 주세요: '+bad[0]);return null}return {to,cc}};
+  $('rpMail').onclick=async()=>{
+    const r=check();if(!r)return;const title=$('rpTitle').value,body=$('rpBody').value.replace(/\r?\n/g,'\r\n');
+    let url='mailto:'+r.to.join(',')+'?'+(r.cc.length?'cc='+encodeURIComponent(r.cc.join(','))+'&':'')+'subject='+encodeURIComponent(title);
+    const full=url+'&body='+encodeURIComponent(body);
+    /* 메일 링크가 길면 일부 메일 프로그램이 내용을 자르므로, 길면 본문은 복사만 */
+    let copied=false;try{await navigator.clipboard.writeText($('rpBody').value);copied=true}catch(e){}
+    const useFull=full.length<=1900;window._lastMailto=useFull?full:url;
+    const a=document.createElement('a');a.href=useFull?full:url;a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+    toast(useFull?'메일 앱을 열었어요':copied?'메일 앱을 열었어요. 내용은 복사해 뒀으니 본문에 붙여 넣으세요':'메일 앱을 열었어요. 내용 복사 버튼으로 복사해 붙여 넣으세요');
+  };
+  $('rpEml').onclick=()=>{
+    const r=check();if(!r)return;const title=$('rpTitle').value,body=$('rpBody').value.replace(/\r?\n/g,'\r\n');
+    const b64=t=>{const u=new TextEncoder().encode(t);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
+    const wrap=t=>t.replace(/(.{76})/g,'$1\r\n');
+    const eml=['To: '+r.to.join(', ')].concat(r.cc.length?['Cc: '+r.cc.join(', ')]:[]).concat([
+      'Subject: =?UTF-8?B?'+b64(title)+'?=','X-Unsent: 1','MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','Content-Transfer-Encoding: base64','',wrap(b64(body))]).join('\r\n');
+    const blob=new Blob([eml],{type:'message/rfc822'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='meeting_'+dotD(st.mon).replace(/\./g,'')+'.eml';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast('메일 파일을 받았어요. 열면 아웃룩에서 보낼 수 있어요');
+  };
   draw();
 }
 
