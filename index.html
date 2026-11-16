@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.4.2">
+<meta name="app-version" content="1.5.0">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -197,7 +197,7 @@ button.ev-row:hover{border-color:var(--line)}
 .dow,.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .dow div{padding:7px 0;text-align:center;font-size:12.5px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line-soft)}
 .cell{min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);background:var(--surface)}
-.cell:nth-child(5n){border-right:0}
+.cell.c5{border-right:0}
 .cell.out{background:var(--sunken)} .cell.out .dn{opacity:.4}
 .cell.sel{box-shadow:inset 0 0 0 2px var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
 .hit{flex:1;min-height:112px;border:0;background:transparent;padding:4px 3px 5px;display:flex;flex-direction:column;gap:2px;text-align:left;min-width:0;color:inherit}
@@ -476,6 +476,14 @@ button.ev-row:hover{border-color:var(--line)}
 .mdots i.lv,.dots i.lv{background:transparent!important;box-shadow:inset 0 0 0 2px var(--pc)}
 .pill.lvp{background:var(--surface-2);color:var(--fg-2)}
 #fKind button{font-size:13px;padding:0 4px}
+.tbdband{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 8px;background:repeating-linear-gradient(135deg,var(--sunken) 0 8px,var(--surface) 8px 16px);border-bottom:1px dashed var(--line);min-width:0}
+.tbd-l{font-size:11.5px;font-weight:700;color:var(--muted);flex:none}
+.tbd-i{display:inline-flex;align-items:center;gap:5px;border:1px dashed var(--faint);border-radius:8px;background:var(--surface);padding:3px 8px 3px 3px;font-size:12px;max-width:100%;min-width:0;color:var(--fg)}
+.tbd-i .pchip{height:20px;font-size:11.5px;padding:0 6px}
+.tbd-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tbd-sec{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.ev-row.tbd{border:1px dashed var(--faint);background:var(--surface)}
+#fTbd{display:inline-flex;align-items:center;gap:6px}
 /* small phones */
 @media (max-width:359px){
   body{font-size:14px}
@@ -653,10 +661,29 @@ function visible(e){
   return true;
 }
 /* one entry per person per event, rank order */
+
+/* 날짜 미정 (그 주 안에): tbd:true, start=그 주 월요일, end=금요일. 날짜 칸에는 안 나오고 주 띠로 표시 */
+const isTbd=e=>!!e&&e.tbd===true;
+function tbdWeek(mon,all){
+  const out=[];
+  S.events.forEach(e=>{if(!isTbd(e)||e.start!==mon)return;splitP(e.person).forEach(p=>{if(all||S.fPerson==='전체'||S.fPerson===p)out.push({e,p})})});
+  return out.sort((a,b)=>(rankOf(a.p)-rankOf(b.p))||a.p.localeCompare(b.p,'ko'));
+}
+const monOf=s=>ymd(weekMon(parse(s)));
+function tbdBand(mon){
+  const ents=tbdWeek(mon);if(!ents.length)return '';
+  const tag=S.readOnly?'div':'button';
+  return `<div class="tbdband" role="group" aria-label="이 주 날짜 미정 일정"><span class="tbd-l">날짜 미정</span>${ents.map(x=>{const e=x.e;
+    return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="tbd-i"><span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span><span class="tbd-t">${esc(placeOf(e))}${e.work?' · '+esc(e.work):''}</span></${tag}>`}).join('')}</div>`;
+}
+function tbdSection(mon,title){
+  const ents=tbdWeek(mon,true);if(!ents.length)return '';
+  return `<div class="tbd-sec"><div class="sec-h"><h2>${title} <span>${ents.length}건</span></h2></div><div class="evs">${ents.map(x=>entRow(x,{memo:true,cls:'tbd'})).join('')}</div></div>`;
+}
 function entriesOn(day,all){
   const out=[];
   {const wd=parse(day).getDay();if(wd===0||wd===6)return out;} /* 주말은 근무하지 않음: 여러 날 일정도 토·일은 비움 */
-  S.events.forEach(e=>{if(!onDay(e,day))return;splitP(e.person).forEach(p=>{if(all||S.fPerson==='전체'||S.fPerson===p)out.push({e,p})})});
+  S.events.forEach(e=>{if(isTbd(e)||!onDay(e,day))return;splitP(e.person).forEach(p=>{if(all||S.fPerson==='전체'||S.fPerson===p)out.push({e,p})})});
   return out.sort((a,b)=>(rankOf(a.p)-rankOf(b.p))||a.p.localeCompare(b.p,'ko'));
 }
 function sitesOf(key){
@@ -691,7 +718,7 @@ function grpRows(day,ents,one){
 }
 function entRow(x,opts){
   const e=x.e;const xc=opts&&opts.cls?' '+opts.cls:'';
-  const range=(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
+  const range=isTbd(e)?`${fmtShort(e.start)} 주 · 날짜 미정`:(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
   const tag=S.readOnly?'div':'button';
   const eq=(e.equipment||[]);
   return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${xc}${isLeave(e)?' leave':''}">
@@ -746,6 +773,7 @@ function vToday(){
         ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:
           ents.length?`<div class="evs">${grpRows(t,ents,(x,c)=>entRow(x,{cls:c}))}</div>`:
           `<div class="empty">오늘은 등록된 출장이 없어요.${S.readOnly?'':`<button type="button" class="btn sm" data-act="go" data-v="cal">캘린더에서 일정 추가</button>`}</div>`}
+        ${tbdSection(monOf(t),'이번 주 날짜 미정')}
         ${nx.length?`<div class="next"><span><b>다음 일정</b> · ${fmtDay(nx[0].start)}</span>${nx.map(e=>`<span>${esc(e.person)} · ${esc(placeOf(e))}</span>`).join('')}</div>`:''}
       </section>
     </div>
@@ -779,9 +807,10 @@ function vCal(){
   const weeks=monthWeeks(S.y,S.m);
   let cells='';
   weeks.forEach(row=>{
+    cells+=tbdBand(ymd(row[0]));
     row.forEach((d,i)=>{
       const k=ymd(d);const ents=entriesOn(k);
-      const cls=['cell'];
+      const cls=['cell'];if(i===4)cls.push('c5');
       if(d.getMonth()!==S.m)cls.push('out');
       if(k===t)cls.push('today');if(k===S.sel&&!isWide())cls.push('sel');
       const pi=grpRows(k,ents,(x,c)=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
@@ -802,7 +831,7 @@ function vCal(){
   if(S.sel){
     const ents=entriesOn(S.sel);
     panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">${[tripN(ents)||!ents.length?`출장 ${tripN(ents)}명`:'',ents.some(x=>isLeave(x.e))?`연차 ${uniqP(ents.filter(x=>isLeave(x.e))).length}명`:''].filter(Boolean).join(' · ')}</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
-      (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${grpRows(S.sel,ents,(x,c)=>entRow(x,{memo:true,cls:c}))}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`);
+      (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${grpRows(S.sel,ents,(x,c)=>entRow(x,{memo:true,cls:c}))}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`)+tbdSection(monOf(S.sel),'이 주 날짜 미정');
   }else panel=`<div class="empty">날짜를 누르면 그날 일정과 일정 추가 버튼이 나와요</div>`;
   return `
   <div class="vh">
@@ -886,7 +915,7 @@ function renderContactResults(){
     h=`<div class="groups">${mainCard('hanbitMain','한빛제이트론 대표번호','대표번호를 등록해 주세요')}
       <section class="grp"><h3>직원 <span>${ppl.length}명</span></h3>
       ${ppl.length?`<div class="list">${ppl.map(c=>{
-        const ev=S.events.filter(e=>onDay(e,t)&&splitP(e.person).includes(c.name))[0];
+        const ev=S.events.filter(e=>!isTbd(e)&&onDay(e,t)&&splitP(e.person).includes(c.name))[0];
         const now=ev?(isLeave(ev)?`<span class="now">오늘 ${esc(leaveOf(ev))}</span>`:`<span class="now c-${custOf(ev.customer).cls}">오늘 ${esc(placeOf(ev))}</span>`):`<span class="now">오늘 출장 일정 없음</span>`;
         return personRow(c,now);
       }).join('')}</div>`:`<div class="empty">${q?'검색 결과가 없어요':'아직 등록된 직원 연락처가 없어요. 오른쪽 위 추가를 눌러 등록하세요.'}</div>`}</section></div>`;
@@ -1447,7 +1476,7 @@ function rptItems(name,a,b){
 }
 function rptBlock(list){
   return list.map((e,i)=>{if(isLeave(e)){const d2=(e.end&&e.end!==e.start)?`${mdD(e.start)}~${mdD(e.end)}`:mdD(e.start);return `${i+1}. ${leaveOf(e)} (${d2})`}const head=`${i+1}. ${rptPlace(e)||'일정'}${e.contact?` (${e.contact})`:''}`;
-    const dt=(e.end&&e.end!==e.start)?`${mdD(e.start)}~${mdD(e.end)}`:mdD(e.start);
+    const dt=isTbd(e)?'날짜 미정':(e.end&&e.end!==e.start)?`${mdD(e.start)}~${mdD(e.end)}`:mdD(e.start);
     const what=e.work||((e.equipment||[]).join(', '))||'';
     return head+'\n   - '+(what?what+' ':'')+'('+dt+')'}).join('\n');
 }
@@ -1528,13 +1557,16 @@ function openEventSheet(ev,date){
   const isEdit=!!ev;
   const names=staff().map(p=>p.name);
   const given=ev?splitP(ev.person):[]; /* 새 일정은 담당자 선택 없이 시작 */
-  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n)),kind:ev&&isLeave(ev)?leaveOf(ev):'업무'};
+  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n)),kind:ev&&isLeave(ev)?leaveOf(ev):'업무',
+    tbd:!!(ev&&isTbd(ev)),mon:weekMon(parse(ev&&isTbd(ev)?ev.start:(date||todayStr())))};
   const others=given.filter(n=>!names.includes(n)).join(', ');
   const d=date||todayStr();
   openSheet(`<form class="sb" id="evF" novalidate>
     <div class="f"><span class="lab">종류</span><div class="seg" id="fKind" role="group" aria-label="일정 종류">${['업무','연차','오전 반차','오후 반차'].map(k=>`<button type="button" data-k="${k}" aria-pressed="${st.kind===k}">${k}</button>`).join('')}</div></div>
     <div class="f"><span class="lab">담당자 (여러 명 선택 가능)</span><div class="picks" id="fPeople"></div><input id="fOther" placeholder="그 외 이름 (쉼표로 구분)" autocomplete="off" value="${esc(others)}" aria-label="그 외 담당자 이름"></div>
-    <div class="two"><div class="f"><label for="fStart">시작일</label><input type="date" id="fStart" value="${esc(ev?ev.start:d)}"></div><div class="f"><label for="fEnd">종료일</label><input type="date" id="fEnd" value="${esc(ev?(ev.end||ev.start):d)}"></div></div>
+    <div class="two" id="fDates"><div class="f"><label for="fStart">시작일</label><input type="date" id="fStart" value="${esc(ev&&!isTbd(ev)?ev.start:d)}"></div><div class="f"><label for="fEnd">종료일</label><input type="date" id="fEnd" value="${esc(ev&&!isTbd(ev)?(ev.end||ev.start):d)}"></div></div>
+    <div class="f" id="fTbdBox"><div class="picks"><button type="button" class="pick" id="fTbd" aria-pressed="false">${ic('cal',16)} 날짜 미정 (이 주 안에)</button></div>
+      <div class="rpt-week" id="fWeek" hidden><button type="button" class="ib" id="fWkPrev" aria-label="이전 주">${ic('back')}</button><div class="txt"><b id="fWkTxt"></b><span class="small muted">날짜가 정해지면 이 일정을 열어 체크를 풀고 날짜를 고르세요</span></div><button type="button" class="ib" id="fWkNext" aria-label="다음 주">${ic('next')}</button></div></div>
     <div id="fWorkBox" class="fbox">
     <div class="f"><span class="lab">방문 고객사 (여러 곳 선택 가능, 누른 순서대로)</span><div class="picks" id="fCust"></div><div class="plist" id="fPlaces"></div></div>
     <div class="f"><label for="fContact">고객 담당자 (선택)</label><input id="fContact" placeholder="예: 장민준 — 미팅 안건 메일에 괄호로 들어가요" autocomplete="off" value="${esc(ev?ev.contact||'':'')}"></div>
@@ -1574,7 +1606,11 @@ function openEventSheet(ev,date){
   picks();
   const WHY='개인 사유에 의한 연차';
   const whyUI=()=>$('fWhy').setAttribute('aria-pressed',$('fMemo').value.includes(WHY));
-  const kindUI=()=>{$('fKind').querySelectorAll('[data-k]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===st.kind));$('fWorkBox').hidden=st.kind!=='업무';$('fLeaveQuick').hidden=st.kind==='업무';whyUI()};
+  const tbdUI=()=>{const on=st.tbd&&st.kind==='업무';$('fTbd').setAttribute('aria-pressed',on);$('fDates').hidden=on;$('fWeek').hidden=!on;$('fTbdBox').hidden=st.kind!=='업무';
+    $('fWkTxt').textContent=`${dotD(st.mon)} (월) ~ ${mdD(ymd(addD(st.mon,4)))} (금)`};
+  $('fTbd').onclick=()=>{st.tbd=!st.tbd;tbdUI()};
+  $('fWkPrev').onclick=()=>{st.mon=addD(st.mon,-7);tbdUI()};$('fWkNext').onclick=()=>{st.mon=addD(st.mon,7);tbdUI()};
+  const kindUI=()=>{$('fKind').querySelectorAll('[data-k]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===st.kind));$('fWorkBox').hidden=st.kind!=='업무';$('fLeaveQuick').hidden=st.kind==='업무';whyUI();tbdUI()};
   /* 연차 사유 빠른 선택: 누르면 메모에 "개인 사유에 의한 연차"가 들어가고, 다시 누르면 빠짐 (메모는 비워도 저장됨) */
   $('fWhy').onclick=()=>{const m=$('fMemo');const v=m.value;
     m.value=v.includes(WHY)?v.replace(WHY,'').replace(/^\s*·\s*|\s*·\s*$/g,'').trim():(v.trim()?WHY+' · '+v.trim():WHY);whyUI()};
@@ -1584,7 +1620,8 @@ function openEventSheet(ev,date){
   $('evF').onsubmit=e=>{e.preventDefault();$('fSave').click()};
   $('fSave').onclick=async()=>{
     const ordered=staff().map(p=>p.name).filter(n=>st.ppl.includes(n)).concat(splitP($('fOther').value).filter(n=>!st.ppl.includes(n)));
-    const person=ordered.join(', '),start=$('fStart').value,end=$('fEnd').value||start;
+    const tbd=st.tbd&&st.kind==='업무';
+    const person=ordered.join(', '),start=tbd?ymd(st.mon):$('fStart').value,end=tbd?ymd(addD(st.mon,4)):($('fEnd').value||start);
     if(!person)return $('fErr').textContent='담당자를 한 명 이상 고르세요.';
     if(!start)return $('fErr').textContent='시작일을 고르세요.';
     if(end<start)return $('fErr').textContent='종료일이 시작일보다 빨라요.';
@@ -1594,8 +1631,8 @@ function openEventSheet(ev,date){
     if(!leave&&st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
     const places=leave?[]:st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
-    const data=leave?{person,start,end,kind:'leave',leaveType:st.kind,places:[],customer:'',customerName:'',site:'',equipment:[],contact:'',work:'',memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now}
-      :{person,start,end,kind:'work',leaveType:'',places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
+    const data=leave?{person,start,end,kind:'leave',leaveType:st.kind,places:[],customer:'',customerName:'',site:'',equipment:[],tbd:false,contact:'',work:'',memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now}
+      :{person,start,end,kind:'work',leaveType:'',places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,tbd,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
@@ -1760,7 +1797,7 @@ function openMainSheet(k){
   $('mSave').onclick=async()=>{try{await saveSettings({[k]:$('mNo').value.trim(),[k+'Note']:$('mNote').value.trim()});closeSheet();render();toast('저장했어요')}catch(err){$('mErr').textContent=failMsg(err)}};
 }
 function openWeather(){
-  const t=todayStr();const list=S.events.filter(e=>onDay(e,t));
+  const t=todayStr();const list=S.events.filter(e=>!isTbd(e)&&onDay(e,t));
   const places=[...new Set(list.flatMap(e=>placesOf(e).map(p=>String(p.site||'').split(/[\s,]+/)[0]||custOf(p.customer).sites[0])).filter(Boolean))];
   const link=p=>`https://search.naver.com/search.naver?query=${encodeURIComponent(p+' 날씨')}`;
   openSheet(`<div class="sb">
