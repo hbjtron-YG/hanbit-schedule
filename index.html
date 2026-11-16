@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.3.0">
+<meta name="app-version" content="1.4.0">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -471,6 +471,11 @@ button.ev-row:hover{border-color:var(--line)}
 .rpt-h{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .rpt-h label{font-size:12.5px;font-weight:600;color:var(--muted)}
 #rpBody{font-family:var(--font);font-size:14px;line-height:1.55;min-height:300px;white-space:pre-wrap;overflow-wrap:anywhere}
+.ev-row.leave,.pitem.leave{border:1px dashed var(--faint);background:var(--surface)}
+.ev-row.leave b,.pitem.leave .pl{color:var(--muted)}
+.mdots i.lv,.dots i.lv{background:transparent!important;box-shadow:inset 0 0 0 2px var(--pc)}
+.pill.lvp{background:var(--surface-2);color:var(--fg-2)}
+#fKind button{font-size:13px;padding:0 4px}
 /* small phones */
 @media (max-width:359px){
   body{font-size:14px}
@@ -670,7 +675,11 @@ const stCls=s=>s==='완료'?'done':s==='진행중'?'ing':'';
 /* 한 일정에 방문지 여러 곳: places[{customer,customerName,site}] (예전 일정은 customer/site 하나) */
 const placesOf=e=>Array.isArray(e.places)&&e.places.length?e.places:(e.customer?[{customer:e.customer,customerName:e.customerName||'',site:e.site||''}]:[]);
 const pName=p=>p.customer==='기타'?(p.customerName||'기타'):p.customer;
-const placeOf=e=>placesOf(e).map(p=>[pName(p),p.site].filter(Boolean).join(' ')).join(' · ');
+/* 연차·반차: kind:'leave', leaveType '연차'|'오전 반차'|'오후 반차' */
+const isLeave=e=>!!e&&e.kind==='leave';
+const leaveOf=e=>e.leaveType||'연차';
+const tripN=ents=>uniqP(ents.filter(x=>!isLeave(x.e))).length;
+const placeOf=e=>isLeave(e)?leaveOf(e):placesOf(e).map(p=>[pName(p),p.site].filter(Boolean).join(' ')).join(' · ');
 const uniqP=ents=>{const seen=new Set();return ents.filter(x=>!seen.has(x.p)&&seen.add(x.p))};
 /* 같은 날 같은 사람의 일정은 한 줄만 보이고 '+n'을 누르면 나머지가 펼쳐짐 */
 function grpRows(day,ents,one){
@@ -685,7 +694,7 @@ function entRow(x,opts){
   const range=(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
   const tag=S.readOnly?'div':'button';
   const eq=(e.equipment||[]);
-  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${xc}">
+  return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${xc}${isLeave(e)?' leave':''}">
     <span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span>
     <span class="body">
       <span class="l1"><b>${esc(placeOf(e))}</b>${range?`<span class="small muted mono">${range}</span>`:''}</span>
@@ -726,14 +735,14 @@ function vToday(){
   for(let i=0;i<5;i++){
     const d=new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i);const k=ymd(d);
     const es=entriesOn(k,true);
-    week+=`<button type="button" class="wd${k===t?' today':''}" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${uniqP(es).length}명"><small>${WD[d.getDay()]}</small><b>${d.getDate()}</b><span class="dots">${uniqP(es).slice(0,4).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span></button>`;
+    week+=`<button type="button" class="wd${k===t?' today':''}" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${tripN(es)}명"><small>${WD[d.getDay()]}</small><b>${d.getDate()}</b><span class="dots">${uniqP(es).slice(0,4).map(x=>`<i class="${isLeave(x.e)?'lv':''}" style="${pst(x.p)}"></i>`).join('')}</span></button>`;
   }
   return `
   <div class="vh"><div class="grow"><span class="eyebrow">Hanbit Jtron</span><h1>현장 검교정 일정</h1></div><span class="date">${fmtDay(t)}</span></div>
   <div class="today-grid">
     <div>
       <section class="card" aria-labelledby="tdH">
-        <div class="card-h"><h2 id="tdH">오늘의 일정</h2>${ents.length?`<span class="pill">출장 ${uniqP(ents).length}명</span>`:''}</div>
+        <div class="card-h"><h2 id="tdH">오늘의 일정</h2>${ents.length?`${tripN(ents)?`<span class="pill">출장 ${tripN(ents)}명</span>`:''}${ents.some(x=>isLeave(x.e))?`<span class="pill lvp">연차 ${uniqP(ents.filter(x=>isLeave(x.e))).length}명</span>`:''}`:''}</div>
         ${S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:
           ents.length?`<div class="evs">${grpRows(t,ents,(x,c)=>entRow(x,{cls:c}))}</div>`:
           `<div class="empty">오늘은 등록된 출장이 없어요.${S.readOnly?'':`<button type="button" class="btn sm" data-act="go" data-v="cal">캘린더에서 일정 추가</button>`}</div>`}
@@ -776,14 +785,14 @@ function vCal(){
       if(d.getMonth()!==S.m)cls.push('out');
       if(k===t)cls.push('today');if(k===S.sel&&!isWide())cls.push('sel');
       const pi=grpRows(k,ents,(x,c)=>{const e=x.e;const eq=(e.equipment||[]).join(', ');const tag=S.readOnly?'div':'button';
-        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem${c?' '+c:''}">
+        return `<${tag} ${tag==='button'?`type="button" data-act="edit-ev" data-id="${esc(e.id)}"`:''} class="pitem${c?' '+c:''}${isLeave(e)?' leave':''}">
           <span class="r1"><span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span><span class="pl">${esc(placeOf(e))}</span></span>
           ${eq||e.work?`<span class="r2">${eq?`<span class="eqs">${esc(eq)}</span>`:''}${eq&&e.work?' · ':''}${esc(e.work||'')}</span>`:''}
         </${tag}>`});
       cells+=`<div class="${cls.join(' ')}">
-        <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${uniqP(ents).length}명${S.readOnly?'':', 눌러서 일정 추가'}">
-          <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${ents.length?uniqP(ents).length+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
-          ${ents.length?`<span class="mdots" aria-hidden="true">${uniqP(ents).map(x=>`<i style="${pst(x.p)}"></i>`).join('')}</span>`:''}
+        <button type="button" class="hit" data-act="pick-day" data-d="${k}" aria-label="${fmtDay(k)} 출장 ${tripN(ents)}명${S.readOnly?'':', 눌러서 일정 추가'}">
+          <span class="dhead"><span class="dn">${d.getDate()}</span><span class="dcount">${tripN(ents)?tripN(ents)+'명':''}</span>${S.readOnly?'':`<span class="addp" aria-hidden="true">${ic('plus',16)}</span>`}</span>
+          ${ents.length?`<span class="mdots" aria-hidden="true">${uniqP(ents).map(x=>`<i class="${isLeave(x.e)?'lv':''}" style="${pst(x.p)}"></i>`).join('')}</span>`:''}
         </button>
         ${pi?`<div class="pitems">${pi}</div>`:''}
       </div>`;
@@ -792,7 +801,7 @@ function vCal(){
   let panel='';
   if(S.sel){
     const ents=entriesOn(S.sel);
-    panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">출장 ${uniqP(ents).length}명</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
+    panel=`<div class="dp-h"><div class="grow"><h2>${fmtDay(S.sel)}</h2><span class="small muted">${[tripN(ents)||!ents.length?`출장 ${tripN(ents)}명`:'',ents.some(x=>isLeave(x.e))?`연차 ${uniqP(ents.filter(x=>isLeave(x.e))).length}명`:''].filter(Boolean).join(' · ')}</span></div>${S.readOnly?'':`<button type="button" class="btn primary" data-act="add-ev">${ic('plus',18)}일정 추가</button>`}</div>`+
       (S.loading?`<div class="empty">일정을 불러오는 중이에요…</div>`:ents.length?`<div class="evs">${grpRows(S.sel,ents,(x,c)=>entRow(x,{memo:true,cls:c}))}</div>`:`<div class="empty">이 날은 등록된 출장이 없어요</div>`);
   }else panel=`<div class="empty">날짜를 누르면 그날 일정과 일정 추가 버튼이 나와요</div>`;
   return `
@@ -878,7 +887,7 @@ function renderContactResults(){
       <section class="grp"><h3>직원 <span>${ppl.length}명</span></h3>
       ${ppl.length?`<div class="list">${ppl.map(c=>{
         const ev=S.events.filter(e=>onDay(e,t)&&splitP(e.person).includes(c.name))[0];
-        const now=ev?`<span class="now c-${custOf(ev.customer).cls}">오늘 ${esc(placeOf(ev))}</span>`:`<span class="now">오늘 출장 일정 없음</span>`;
+        const now=ev?(isLeave(ev)?`<span class="now">오늘 ${esc(leaveOf(ev))}</span>`:`<span class="now c-${custOf(ev.customer).cls}">오늘 ${esc(placeOf(ev))}</span>`):`<span class="now">오늘 출장 일정 없음</span>`;
         return personRow(c,now);
       }).join('')}</div>`:`<div class="empty">${q?'검색 결과가 없어요':'아직 등록된 직원 연락처가 없어요. 오른쪽 위 추가를 눌러 등록하세요.'}</div>`}</section></div>`;
   }else{
@@ -1437,7 +1446,7 @@ function rptItems(name,a,b){
   return S.events.filter(e=>splitP(e.person).includes(name)&&e.start<=B&&(e.end||e.start)>=A).sort((x,y)=>String(x.start).localeCompare(String(y.start)));
 }
 function rptBlock(list){
-  return list.map((e,i)=>{const head=`${i+1}. ${rptPlace(e)||'일정'}${e.contact?` (${e.contact})`:''}`;
+  return list.map((e,i)=>{if(isLeave(e)){const d2=(e.end&&e.end!==e.start)?`${mdD(e.start)}~${mdD(e.end)}`:mdD(e.start);return `${i+1}. ${leaveOf(e)} (${d2})`}const head=`${i+1}. ${rptPlace(e)||'일정'}${e.contact?` (${e.contact})`:''}`;
     const dt=(e.end&&e.end!==e.start)?`${mdD(e.start)}~${mdD(e.end)}`:mdD(e.start);
     const what=e.work||((e.equipment||[]).join(', '))||'';
     return head+'\n   - '+(what?what+' ':'')+'('+dt+')'}).join('\n');
@@ -1519,15 +1528,18 @@ function openEventSheet(ev,date){
   const isEdit=!!ev;
   const names=staff().map(p=>p.name);
   const given=ev?splitP(ev.person):[]; /* 새 일정은 담당자 선택 없이 시작 */
-  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n))};
+  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n)),kind:ev&&isLeave(ev)?leaveOf(ev):'업무'};
   const others=given.filter(n=>!names.includes(n)).join(', ');
   const d=date||todayStr();
   openSheet(`<form class="sb" id="evF" novalidate>
+    <div class="f"><span class="lab">종류</span><div class="seg" id="fKind" role="group" aria-label="일정 종류">${['업무','연차','오전 반차','오후 반차'].map(k=>`<button type="button" data-k="${k}" aria-pressed="${st.kind===k}">${k}</button>`).join('')}</div></div>
     <div class="f"><span class="lab">담당자 (여러 명 선택 가능)</span><div class="picks" id="fPeople"></div><input id="fOther" placeholder="그 외 이름 (쉼표로 구분)" autocomplete="off" value="${esc(others)}" aria-label="그 외 담당자 이름"></div>
     <div class="two"><div class="f"><label for="fStart">시작일</label><input type="date" id="fStart" value="${esc(ev?ev.start:d)}"></div><div class="f"><label for="fEnd">종료일</label><input type="date" id="fEnd" value="${esc(ev?(ev.end||ev.start):d)}"></div></div>
+    <div id="fWorkBox" class="fbox">
     <div class="f"><span class="lab">방문 고객사 (여러 곳 선택 가능, 누른 순서대로)</span><div class="picks" id="fCust"></div><div class="plist" id="fPlaces"></div></div>
     <div class="f"><label for="fContact">고객 담당자 (선택)</label><input id="fContact" placeholder="예: 장민준 — 미팅 안건 메일에 괄호로 들어가요" autocomplete="off" value="${esc(ev?ev.contact||'':'')}"></div>
-    <div class="f"><label for="fWork">작업내용</label><input id="fWork" placeholder="예: 정기 교정 4대, 긴급 수리" autocomplete="off" value="${esc(ev?ev.work||'':'')}"></div>
+    <div class="f"><label for="fWork">작업내용</label><input id="fWork" placeholder="예: 정기 교정 4대, 긴급 수리" autocomplete="off" value="${esc(ev&&!isLeave(ev)?ev.work||'':'')}"></div>
+    </div>
     <div class="f"><label for="fMemo">메모</label><textarea id="fMemo" rows="3" placeholder="사유, 출입 신청, 준비물 등 자유롭게">${esc(ev?ev.memo||'':'')}</textarea></div>
     <div class="err" id="fErr"></div>
   </form>
@@ -1559,6 +1571,8 @@ function openEventSheet(ev,date){
     $('siteList').innerHTML=used.map(x=>`<option value="${esc(x)}">`).join('');
   };
   picks();
+  const kindUI=()=>{$('fKind').querySelectorAll('[data-k]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===st.kind));$('fWorkBox').hidden=st.kind!=='업무'};
+  $('fKind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{st.kind=b.dataset.k;kindUI()});kindUI();
   $('fStart').onchange=()=>{if($('fEnd').value<$('fStart').value)$('fEnd').value=$('fStart').value};
   $('evF').onsubmit=e=>{e.preventDefault();$('fSave').click()};
   $('fSave').onclick=async()=>{
@@ -1567,12 +1581,14 @@ function openEventSheet(ev,date){
     if(!person)return $('fErr').textContent='담당자를 한 명 이상 고르세요.';
     if(!start)return $('fErr').textContent='시작일을 고르세요.';
     if(end<start)return $('fErr').textContent='종료일이 시작일보다 빨라요.';
-    syncPl();
-    if(!st.pl.length)return $('fErr').textContent='방문할 고객사를 한 곳 이상 고르세요.';
-    if(st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
-    const places=st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
+    const leave=st.kind!=='업무';
+    if(!leave){syncPl();
+    if(!st.pl.length)return $('fErr').textContent='방문할 고객사를 한 곳 이상 고르세요.';}
+    if(!leave&&st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
+    const places=leave?[]:st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
-    const data={person,start,end,places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
+    const data=leave?{person,start,end,kind:'leave',leaveType:st.kind,places:[],customer:'',customerName:'',site:'',equipment:[],contact:'',work:'',memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now}
+      :{person,start,end,kind:'work',leaveType:'',places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
