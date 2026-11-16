@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.10.3">
+<meta name="app-version" content="1.10.4">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -431,7 +431,8 @@ button.ev-row:hover{border-color:var(--line)}
 .ac-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(15,23,42,.18);max-height:300px;overflow:auto;padding:4px}
 .ac-opt{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;width:100%;padding:10px 12px;border-radius:9px;cursor:pointer}
 .ac-opt:hover,.ac-opt:focus-visible{background:var(--sunken)}
-.ac-opt b{font-size:15px}.ac-opt .small{color:var(--muted);overflow-wrap:anywhere}
+.ac-opt b{font-size:15px}
+.eq-l2{font-size:14px;overflow-wrap:anywhere}.eq-l2 b{font-size:15px}.eq-l1{color:var(--muted);overflow-wrap:anywhere}.ac-opt .small{color:var(--muted);overflow-wrap:anywhere}
 .ac-opt.free .small{color:var(--fg-2)}
 .units{display:flex;flex-direction:column;gap:6px}
 .units:empty{display:none}
@@ -1778,6 +1779,12 @@ async function equipMetaIn(d,force){
   if(rows){S.equip=rows;S.eqLoad='ok'}else S.eqLoad='fail';
   render();
 }
+/* 장비 표시: D Product · K 호기 / A 회사명, B 담당자, C 위치 / E S/N */
+function eqDesc(r){
+  const top=[r.p?esc(r.p):'',`<b>${esc(r.h||'(호기 없음)')}</b>`].filter(Boolean).join(' · ');
+  const mid=[r.c,r.m?'담당자 '+r.m:'',r.l].filter(Boolean).map(esc).join(', ');
+  return `<span class="eq-l2">${top}</span>${mid?`<span class="small eq-l1">${mid}</span>`:''}<span class="small eq-l1">S/N ${esc(r.s||'—')}</span>`;
+}
 const eqKey=v=>String(v||'').toUpperCase().replace(/[\s\-_]/g,'');
 function eqFind(q,sites){
   const k=eqKey(q);if(!k)return [];
@@ -1863,9 +1870,9 @@ function eqUpload(){
     const pv=rows.slice(0,5);
     openSheet(`<div class="sb">
       <p style="margin:0"><b>${esc(f.name)}</b> · 「${esc(sh.name)}」 시트에서 장비 <b>${rows.length}대</b>를 찾았어요.</p>
-      <div class="eq-pv"><table><thead><tr><th>회사명</th><th>담당자</th><th>위치</th><th>Product</th><th>S/N</th><th>호기</th></tr></thead><tbody>${pv.map(r=>`<tr><td>${esc(r.c)}</td><td>${esc(r.m)}</td><td>${esc(r.l)}</td><td>${esc(r.p)}</td><td>${esc(r.s)}</td><td>${esc(r.h)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="eq-pv"><table><thead><tr><th>회사명</th><th>담당자</th><th>위치</th><th>Product</th><th>호기</th><th>S/N</th></tr></thead><tbody>${pv.map(r=>`<tr><td>${esc(r.c)}</td><td>${esc(r.m)}</td><td>${esc(r.l)}</td><td>${esc(r.p)}</td><td>${esc(r.h)}</td><td>${esc(r.s)}</td></tr>`).join('')}</tbody></table></div>
       ${rows.length>5?`<p class="small muted" style="margin:0">처음 5대만 보여요.</p>`:''}
-      <p class="small muted" style="margin:0">A 회사명 · B 담당자 · C 장비 위치 · D Product · E S/N · K 호기를 읽었어요. 회사명 칸이 비어 있으면(셀 병합) 바로 위 회사명을 써요.${S.equip.length?` 지금 있는 장비 목록 ${S.equip.length}대는 이 파일로 바뀌어요. 이미 일정에 적은 호기·S/N은 그대로 남아요.`:''}</p>
+      <p class="small muted" style="margin:0">A 회사명 · B 담당자 · C 장비 위치 · D Product · K 호기 · E S/N을 읽었어요. 회사명 칸이 비어 있으면(셀 병합) 바로 위 회사명을 써요.${S.equip.length?` 지금 있는 장비 목록 ${S.equip.length}대는 이 파일로 바뀌어요. 이미 일정에 적은 호기·S/N은 그대로 남아요.`:''}</p>
       <p class="small" style="margin:0;color:#B45309">로그인 기능이 생기기 전에는 사이트 주소를 아는 사람은 장비 목록을 볼 수 있어요.</p>
       <div class="err" id="eqErr"></div>
     </div><footer><button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary grow" id="eqOk">${rows.length}대 저장</button></footer>`,'장비 목록 올리기','확인 후 저장하면 모두에게 공유돼요');
@@ -1881,7 +1888,7 @@ function eqCard(){
     ${m&&S.eqLoad==='loading'?`<p class="small" style="margin:0;color:var(--fg-2)">장비 목록 ${m.count}대를 불러오는 중이에요…</p>`:''}
     ${m&&S.eqLoad==='fail'?`<p class="small" style="margin:0;color:#B45309">장비 목록 ${m.count}대가 저장돼 있지만 불러오지 못했어요. 인터넷 연결을 확인하고 다시 불러와 주세요.</p><button type="button" class="btn sm" data-act="eq-reload">다시 불러오기</button>`:''}
     <p class="small" style="margin:0;color:var(--fg-2)">${n?`<b>${n}대</b> 등록됨${m&&m.file?` · ${esc(m.file)}`:''}${when?` · ${when}`:''}${m&&m.by?` · ${esc(m.by)}`:''}`:(m?'':'아직 없어요. 장비 엑셀(.xlsx)을 올리면 일정 입력의 「호기」 칸에서 찾아 고를 수 있어요.')}</p>
-    <p class="small muted" style="margin:0">읽는 열: A 회사명 · B 담당자 · C 장비 위치 · D Product · E S/N · K 호기</p>
+    <p class="small muted" style="margin:0">읽는 열: A 회사명 · B 담당자 · C 장비 위치 · D Product · K 호기 · E S/N</p>
     ${S.readOnly?'':`<button type="button" class="btn" data-act="eq-up">${ic('up',18)}${n?'장비 엑셀 다시 올리기':'장비 엑셀 올리기'}</button>`}
     <button type="button" class="btn" data-act="xlsx">${ic('down',18)}장비별 작업 이력 받기</button>
     ${n&&!S.readOnly?`<button type="button" class="btn sm${ask?' danger':' ghost'}" data-act="eq-clear">${ask?'정말 장비 목록 지우기':'장비 목록 지우기'}</button>`:''}
@@ -1902,12 +1909,12 @@ function eqHistDownload(from,to,ppl){
   W.forEach(w=>{let k=keyOf(w.u);if(!map.has(k)){const alt=[...map.values()].find(x=>eqKey(x.r.h)&&eqKey(x.r.h)===eqKey(w.u.h));if(alt)k=keyOf(alt.r);else map.set(k,{r:{c:w.u.c||'',m:w.u.m||'',l:w.u.l||'',p:w.u.p||'',s:w.u.s||'',h:w.u.h||''},ws:[],extra:true})}map.get(k).ws.push(w)});
   const dt=e=>isTbd(e)?`${e.start} 주(날짜 미정)`:(e.end&&e.end!==e.start?`${e.start}~${e.end}`:e.start);
   const line=w=>`${dt(w.e)} ${w.who.join(', ')}${w.e.work?' · '+w.e.work:''}${w.e.memo?' · 메모: '+w.e.memo.replace(/\s*\n\s*/g,' / '):''}`;
-  const h1=['회사명','담당자','장비 위치','Product','S/N','호기','작업 횟수','최근 작업일','작업 이력 (날짜 · 한 사람 · 작업내용 · 메모)','비고'];
-  const r1=[...map.values()].map(x=>[x.r.c,x.r.m,x.r.l,x.r.p,x.r.s,x.r.h,x.ws.length,x.ws.length?x.ws[x.ws.length-1].e.start:'',x.ws.map(line).join('\n'),x.extra?'장비 목록에 없는 호기':'']);
-  const h2=['시작일','요일','종료일','호기','S/N','Product','회사명','장비 위치','한 사람','방문 고객사/사이트','작업내용','메모'];
+  const h1=['회사명','담당자','장비 위치','Product','호기','S/N','작업 횟수','최근 작업일','작업 이력 (날짜 · 한 사람 · 작업내용 · 메모)','비고'];
+  const r1=[...map.values()].map(x=>[x.r.c,x.r.m,x.r.l,x.r.p,x.r.h,x.r.s,x.ws.length,x.ws.length?x.ws[x.ws.length-1].e.start:'',x.ws.map(line).join('\n'),x.extra?'장비 목록에 없는 호기':'']);
+  const h2=['시작일','요일','종료일','회사명','담당자','장비 위치','Product','호기','S/N','한 사람','방문 고객사/사이트','작업내용','메모'];
   const r2=W.map(w=>{const m=map.get(keyOf(w.u))||[...map.values()].find(x=>x.ws.includes(w))||{r:w.u};const r=m.r;
-    return [w.e.start,WD[new Date(w.e.start+'T00:00:00').getDay()],w.e.end||w.e.start,w.u.h||r.h||'',w.u.s||r.s||'',r.p||w.u.p||'',r.c||w.u.c||'',r.l||w.u.l||'',w.who.join(', '),rptPlace(w.e),w.e.work||'',w.e.memo||'']});
-  const blob=xlsxBook([{name:'장비별 이력',head:h1,rows:r1,widths:[16,10,16,12,14,14,9,12,70,18]},{name:'작업 목록',head:h2,rows:r2,widths:[12,6,12,14,14,12,16,16,12,20,36,30]}]);
+    return [w.e.start,WD[new Date(w.e.start+'T00:00:00').getDay()],w.e.end||w.e.start,r.c||w.u.c||'',r.m||w.u.m||'',r.l||w.u.l||'',r.p||w.u.p||'',w.u.h||r.h||'',w.u.s||r.s||'',w.who.join(', '),rptPlace(w.e),w.e.work||'',w.e.memo||'']});
+  const blob=xlsxBook([{name:'장비별 이력',head:h1,rows:r1,widths:[16,10,16,12,14,14,9,12,70,18]},{name:'작업 목록',head:h2,rows:r2,widths:[12,6,12,16,10,16,12,14,14,12,20,36,30]}]);
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`hanbit_equipment_${from.replace(/-/g,'')}-${to.replace(/-/g,'')}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   toast(`장비별 작업 이력을 받았어요 (작업 ${W.length}건)`);
 }
@@ -2071,8 +2078,7 @@ function openEventSheet(ev,date){
   picks();
   /* 호기: 장비 목록에서 자동완성 → 고르면 S/N·Product·위치 표시 */
   const uKey=u=>eqKey(u.s)+'|'+eqKey(u.h);
-  const unitsUI=()=>{$('fUnits').innerHTML=st.units.map((u,i)=>`<div class="unit"><div class="txt"><b>${esc(u.h||'(호기 없음)')}</b>${u.p?` <span class="muted">${esc(u.p)}</span>`:''}
-      <span class="small">S/N <b>${esc(u.s||'—')}</b>${u.c?` · ${esc(u.c)}`:''}${u.l?` · ${esc(u.l)}`:''}${u.m?` · 담당자 <b>${esc(u.m)}</b>`:''}</span></div><button type="button" class="btn ghost sm" data-ur="${i}" aria-label="${esc(u.h)} 빼기">빼기</button></div>`).join('');
+  const unitsUI=()=>{$('fUnits').innerHTML=st.units.map((u,i)=>`<div class="unit"><div class="txt">${eqDesc(u)}</div><button type="button" class="btn ghost sm" data-ur="${i}" aria-label="${esc(u.h)} 빼기">빼기</button></div>`).join('');
     $('fUnits').querySelectorAll('[data-ur]').forEach(b=>b.onclick=()=>{st.units.splice(+b.dataset.ur,1);unitsUI()})};
   let acHits=[];
   const acClose=()=>{const l=$('fUnitList'),i=$('fUnit');if(l)l.hidden=true;if(i)i.setAttribute('aria-expanded','false')};
@@ -2080,7 +2086,7 @@ function openEventSheet(ev,date){
   const acDraw=()=>{const q=$('fUnit').value.trim();if(!q){acClose();return}
     syncPl();acHits=eqFind(q,st.pl.flatMap(p=>splitP(p.site)));
     const free=!acHits.some(r=>eqKey(r.h)===eqKey(q));
-    $('fUnitList').innerHTML=acHits.map((r,i)=>`<button type="button" class="ac-opt" role="option" data-ai="${i}"><b>${esc(r.h)}</b><span class="small">${[r.p,r.s?'S/N '+r.s:'',r.c,r.l,r.m?'담당자 '+r.m:''].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')
+    $('fUnitList').innerHTML=acHits.map((r,i)=>`<button type="button" class="ac-opt" role="option" data-ai="${i}">${eqDesc(r)}</button>`).join('')
       +(free?`<button type="button" class="ac-opt free" role="option" data-af="1"><span class="small">${acHits.length?'':'장비 목록에 없어요 · '}「${esc(q)}」 그대로 넣기</span></button>`:'');
     $('fUnitList').hidden=false;$('fUnit').setAttribute('aria-expanded','true');
     $('fUnitList').querySelectorAll('[data-ai]').forEach(b=>b.onmousedown=b.onclick=ev2=>{ev2.preventDefault();acPick(acHits[+b.dataset.ai])});
