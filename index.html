@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.7.0">
+<meta name="app-version" content="1.8.0">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -426,6 +426,7 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
 .cf-more{color:var(--accent,#2563EB);font-weight:600}
 .cfd{display:flex;flex-direction:column;gap:14px}
+.rp-badge{flex:none;align-self:center;padding:4px 10px;border-radius:999px;background:#F39A2B;color:#fff;font-size:13px;font-weight:700}
 .cfd-sum{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:#FFF4E5;color:#5A3000}
 .cfd-sum .cf-cup{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#F39A2B;color:#fff}
 :root[data-theme="dark"] .cfd-sum{background:#3A2A12;color:#FFD9A8}
@@ -1074,7 +1075,17 @@ function ladPool(){const L=ladInit();const st=staff().map(p=>p.name);return st.c
 function ladSort(){const L=S.lad;const pool=ladPool();L.names=pool.filter(x=>L.names.includes(x)).slice(0,LAD_MAX);L.n=L.names.length;L.k=Math.min(Math.max(1,L.n-1),Math.max(1,L.k))}
 function ladSave(){const L=S.lad;store.set('hj.lad',JSON.stringify({sel:L.names,extra:L.extra,k:L.k}))}
 function ladName(i){const L=S.lad;return String(L.names[i]||'').trim()||('참가자 '+(i+1))}
+/* 다시보기용 기록: 게임 중 뽑은 난수(r)와 프레임 시간(t, ms)을 기록(rec)하거나 그대로 다시 씀(play) */
+let RP=null;
+function frameDt(raw){
+  if(RP&&RP.mode==='play'){const v=RP.t[RP.ti++];return v!=null?v/1000:raw}
+  const q=Math.max(0,Math.round(raw*1000));if(RP&&RP.mode==='rec')RP.t.push(q);return q/1000;
+}
 function rnd(max){/* 0 이상 max 미만, 고른 난수 */
+  if(RP&&RP.mode==='play'){const v=RP.r[RP.ri++];if(v!=null&&v>=0&&v<max)return v}
+  const x=rnd0(max);if(RP&&RP.mode==='rec')RP.r.push(x);return x;
+}
+function rnd0(max){
   try{const a=new Uint32Array(1);const lim=Math.floor(4294967296/max)*max;let x;do{crypto.getRandomValues(a);x=a[0]}while(x>=lim);return x%max}catch(e){return Math.floor(Math.random()*max)}
 }
 function ladNew(){
@@ -1112,8 +1123,9 @@ function ladStepper(act,label,val,min,max){
 }
 function vLadder(){
   const L=ladInit();
-  const head=`<div class="vh"><button type="button" class="ib flat" data-act="go" data-v="coffee" aria-label="커피내기로">${ic('back')}</button><div class="grow"><h1>사다리타기</h1></div></div>`;
   if(!L.game)ladNew();
+  const RG=L.game.replay;
+  const head=`<div class="vh"><button type="button" class="ib flat" data-act="go" data-v="coffee" aria-label="커피내기로">${ic('back')}</button><div class="grow"><h1>사다리타기${RG?' 다시보기':''}</h1>${RG?`<span class="small muted">${cfWhen(RG)}${RG.by?` · ${esc(RG.by)} 진행`:''}</span>`:''}</div>${RG?'<span class="rp-badge">다시보기</span>':''}</div>`;
   const G=L.game,n=G.n;
   const avail=Math.min(isWide()?window.innerWidth-232-64:window.innerWidth-32,760)-34;
   const cw=Math.max(40,Math.min(110,Math.floor(avail/n)));
@@ -1146,15 +1158,15 @@ function vLadder(){
   return head+`<div class="lad-play">
     <section class="card">
       <div class="card-h"><h2>${n}명 중 ${G.k}명 커피</h2>
-        <button type="button" class="btn sm" data-act="lad-again">${ic('ladder',16)}새 사다리</button>
-        <button type="button" class="btn sm" data-act="lad-edit">인원·이름 바꾸기</button></div>
-      <p class="small muted" style="margin:0">아래 버튼을 누를 때마다 왼쪽부터 한 명씩 내려가요.</p>
+        ${RG?'':`<button type="button" class="btn sm" data-act="lad-again">${ic('ladder',16)}새 사다리</button>
+        <button type="button" class="btn sm" data-act="lad-edit">인원·이름 바꾸기</button>`}</div>
+      <p class="small muted" style="margin:0">${RG?'그때 사다리를 왼쪽부터 한 명씩 다시 내려가요.':'아래 버튼을 누를 때마다 왼쪽부터 한 명씩 내려가요.'}</p>
       <div class="lad-wrap"><div class="lad-board${cw<52?' tight':''}" style="width:${W}px">
         <div class="lad-row" ${grid}>${tops}</div>
         ${svg}
         <div class="lad-row" ${grid}>${bots}</div>
       </div></div>
-      ${(()=>{const nx=G.all?-1:[...Array(n).keys()].find(i=>!G.shown.includes(i));return nx==null||nx<0?'':`<div class="lad-btns"><button type="button" class="btn primary gbig" data-act="lad-run" data-i="${nx}">${ic('next',18)}${esc(G.names[nx])} 내려가기 <span class="lad-cnt">${G.shown.length+1}/${n}</span></button>
+      ${RG?(G.shown.length>=n&&L.anim==null?`<div class="lad-btns"><button type="button" class="btn primary" data-act="cf-lad-again">${ic('next',18)}처음부터 다시 보기</button><button type="button" class="btn" data-act="go" data-v="coffee">커피내기로</button></div>`:`<p class="gmsg">다시보기 중… ${G.shown.length}/${n}</p>`):(()=>{const nx=G.all?-1:[...Array(n).keys()].find(i=>!G.shown.includes(i));return nx==null||nx<0?'':`<div class="lad-btns"><button type="button" class="btn primary gbig" data-act="lad-run" data-i="${nx}">${ic('next',18)}${esc(G.names[nx])} 내려가기 <span class="lad-cnt">${G.shown.length+1}/${n}</span></button>
         <button type="button" class="btn" data-act="lad-all">전체 결과 한 번에 보기</button></div>`})()}
     </section>
     ${allWin?`<section class="card lad-result" role="status"><span class="lad-cup">${ic('cup',28)}</span><div><b>${winners.map(esc).join(', ')}</b><span>님이 커피를 사요!</span></div></section>`:''}
@@ -1175,10 +1187,36 @@ function coffeePlayers(){const L=ladInit();return [...Array(L.n).keys()].map(i=>
 /* 커피내기 결과 공유: settings/coffee {log:[최근 30개]}, 모두에게 보임 */
 const CF_MAX=30;
 function cfGameName(id){const g=GAMES.find(x=>x.id===id);return g?g.name:'커피내기'}
-function coffeeLog(game,names,k,losers,d){
-  const rec={at:Date.now(),game,names:names.slice(0,LAD_MAX),k,losers:losers.slice(),by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};if(d)rec.d=d;
-  const log=[rec,...(S.coffee||[])].slice(0,CF_MAX);S.coffee=log;
-  if(db&&!S.readOnly)db.doc('settings/coffee').set({log}).catch(()=>toast('결과를 공유하지 못했어요'));
+function coffeeLog(game,names,k,losers,d,tape){
+  const rec={at:Date.now(),game,names:names.slice(0,LAD_MAX),k,losers:losers.slice(),by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};if(d)rec.d=d;if(tape)rec.rp=1;
+  const all=[rec,...(S.coffee||[])];const log=all.slice(0,CF_MAX);S.coffee=log;
+  if(db&&!S.readOnly){
+    if(tape)db.doc('settings/cfr-'+rec.at).set({game,...tape}).catch(()=>{});
+    db.doc('settings/coffee').set({log}).catch(()=>toast('결과를 공유하지 못했어요'));
+    all.slice(CF_MAX).forEach(r=>{if(r.rp)db.doc('settings/cfr-'+r.at).delete().catch(()=>{})});
+  }
+}
+function cfLoadTape(at){
+  return new Promise(res=>{if(!db){res(null);return}let un=null,done=false;
+    const fin=v=>{if(done)return;done=true;try{un&&un()}catch(e){}res(v)};
+    try{un=db.doc('settings/cfr-'+at).onSnapshot(sn=>{const d=sn&&sn.data&&sn.data();if(d&&(d.r!=null||d.mf))fin(d);else if(sn&&sn.metadata&&!sn.metadata.fromCache)fin(null);else if(!(sn&&sn.metadata))fin(d||null)},()=>fin(null))}catch(e){fin(null)}
+    setTimeout(()=>fin(null),8000)});
+}
+function cfCanReplay(r){return r.game==='ladder'?!!(r.d&&r.d.rung):!!r.rp}
+async function startReplay(r){
+  if(r.game==='ladder'){
+    const L=ladInit();const d=r.d;
+    L.game={n:r.names.length,k:r.k,rung:d.rung.map(x=>[...x].map(c=>c==='1')),prize:d.prize.map(Boolean),names:r.names.slice(),shown:[],all:false,logged:true,replay:r};L.anim=null;
+    go('ladder');
+    const tick=()=>{const G=S.lad&&S.lad.game;if(!G||G.replay!==r||S.view!=='ladder')return;
+      const nx=[...Array(G.n).keys()].find(i=>!G.shown.includes(i));if(nx==null)return;
+      A['lad-run']({dataset:{i:String(nx)}});S.rpT=setTimeout(tick,1900)};
+    S.rpT=setTimeout(tick,900);return;
+  }
+  toast('다시보기를 불러오는 중…');
+  const tape=await cfLoadTape(r.at);
+  if(!tape){toast('다시보기 자료를 찾지 못했어요');return}
+  S.replay={rec:r,tape};S.game=r.game;go('play');
 }
 function cfToday(){const t=todayStr();return (S.coffee||[]).filter(r=>ymd(new Date(r.at))===t)}
 function cfWhen(r){const d=new Date(r.at),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');return (ymd(d)===todayStr()?'오늘':`${d.getMonth()+1}.${d.getDate()} (${WD[d.getDay()]})`)+' '+hm}
@@ -1220,6 +1258,7 @@ function cfDetail(r){
   }else how='<div class="empty">진행 내용을 읽지 못했어요.</div>';
   return `<div class="sb cfd">
     <div class="cfd-sum"><span class="cf-cup">${ic('cup',22)}</span><div><b>${(r.losers||[]).map(esc).join(', ')} 님이 커피를 사요</b><div class="small">${cfWhen(r)} · ${esc(cfGameName(r.game))} · ${names.length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</div></div></div>
+    ${cfCanReplay(r)?`<button type="button" class="btn primary" id="cfReplay">${ic('next',18)}그때 게임 다시보기</button>`:''}
     <section><h3>어떻게 걸렸나</h3>${rule?`<p class="small muted" style="margin:4px 0 10px">${rule}</p>`:''}${how}</section>
     <p class="small muted" style="margin:0">참가: ${names.map(esc).join(', ')}</p>
   </div>`;
@@ -1229,7 +1268,7 @@ function cfRow(r){
   return `<div class="cf-log${k===t?' today':''}"><button type="button" class="cf-open" data-act="cf-open" data-at="${r.at}" aria-label="${(r.losers||[]).map(esc).join(', ')} 님 커피, 진행 기록 보기"><span class="cf-cup">${ic('cup',18)}</span><span class="txt"><b>${(r.losers||[]).map(esc).join(', ')} 님 커피</b>
     <span class="small muted">${cfWhen(r)} · ${esc(cfGameName(r.game))} · ${(r.names||[]).length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</span>
     <span class="small muted cf-ppl">참가: ${(r.names||[]).map(esc).join(', ')}</span>
-    <span class="small cf-more">${r.d?'어떻게 걸렸는지 보기 ›':'진행 기록 없음'}</span></span></button>
+    <span class="small cf-more">${cfCanReplay(r)?'다시보기 · 진행 기록 ›':r.d?'어떻게 걸렸는지 보기 ›':'진행 기록 없음'}</span></span></button>
     ${S.readOnly?'':(()=>{const ask=S.cfAsk===String(r.at);return `<button type="button" class="btn sm${ask?' danger':''}" data-act="cf-del" data-at="${r.at}" aria-label="${ask?'한 번 더 누르면 삭제':'이 결과 삭제'}">${ask?'정말 삭제':'삭제'}</button>`})()}</div>`;
 }
 function cfSection(list,title,empty,extra){
@@ -1265,20 +1304,28 @@ function vCoffee(){
   </div>`;
 }
 function vPlay(){
-  const g=GAMES.find(x=>x.id===S.game)||GAMES[1];const L=ladInit();
+  const g=GAMES.find(x=>x.id===S.game)||GAMES[1];const L=ladInit();const R=S.replay&&S.replay.rec;
   return `<div class="vh"><button type="button" class="ib flat" data-act="go" data-v="coffee" aria-label="커피내기로">${ic('back')}</button>
-    <div class="grow"><h1>${g.name}</h1><span class="small muted">${L.n}명 중 ${L.k}명 커피</span></div></div>
+    <div class="grow"><h1>${g.name}${R?' 다시보기':''}</h1><span class="small muted">${R?`${cfWhen(R)} · ${R.names.length}명 중 ${R.k}명 커피${R.by?` · ${esc(R.by)} 진행`:''}`:`${L.n}명 중 ${L.k}명 커피`}</span></div>${R?'<span class="rp-badge">다시보기</span>':''}</div>
   <div class="lad-play">
     <section class="card gcard"><div id="gameStage" class="gstage gs-${g.id}"></div><div class="gctl" id="gameCtl"></div></section>
     <div id="gResult" aria-live="polite"></div>
   </div>`;
 }
-function stopGame(){if(S.gameStop){try{S.gameStop()}catch(e){}S.gameStop=null}}
+function stopGame(){if(RP&&RP.timers){RP.timers.forEach(clearTimeout);RP.timers=[]}if(S.gameStop){try{S.gameStop()}catch(e){}S.gameStop=null}}
+const rpPlay=()=>!!(RP&&RP.mode==='play');
+function rpLater(f,ms){const id=setTimeout(f,ms);if(RP&&RP.timers)RP.timers.push(id);return id}
 function gameDone(losers,d){
   const box=$('gResult');if(!box)return;
+  if(rpPlay()){
+    box.innerHTML=`<section class="card lad-result" role="status"><span class="lad-cup">${ic('cup',28)}</span><div><b>${losers.map(esc).join(', ')}</b><span>님이 커피를 사요! (다시보기)</span></div></section>
+      <div class="gbtns"><button type="button" class="btn primary" data-act="g-again">${ic('next',18)}처음부터 다시 보기</button><button type="button" class="btn" data-act="go" data-v="coffee">커피내기로</button></div>`;
+    setTimeout(()=>{try{box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}},50);return;
+  }
+  const tape=RP&&RP.mode==='rec'?{r:RP.r.join(','),t:RP.t.join(','),mf:RP.mf}:null;
   box.innerHTML=`<section class="card lad-result" role="status"><span class="lad-cup">${ic('cup',28)}</span><div><b>${losers.map(esc).join(', ')}</b><span>님이 커피를 사요!</span></div></section>
     <div class="gbtns"><button type="button" class="btn primary" data-act="g-again">${ic('ladder',18)}한 번 더</button><button type="button" class="btn" data-act="go" data-v="coffee">다른 게임</button></div>`;
-  coffeeLog(S.game,coffeePlayers().map(p=>p.nm),ladInit().k,losers,d);
+  coffeeLog(S.game,coffeePlayers().map(p=>p.nm),ladInit().k,losers,d,tape);
   try{navigator.vibrate&&navigator.vibrate(150)}catch(e){}
   setTimeout(()=>{try{box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}},50);
 }
@@ -1286,7 +1333,10 @@ function mountGame(){
   stopGame();
   const st=$('gameStage'),ctl=$('gameCtl');if(!st)return;
   $('gResult').innerHTML='';
-  const ps=coffeePlayers(),k=ladInit().k;
+  let ps,k;
+  if(S.replay){const R=S.replay;ps=R.rec.names.map((nm,i)=>({nm,i}));k=R.rec.k;
+    RP={mode:'play',r:R.tape.r?String(R.tape.r).split(',').map(Number):[],t:R.tape.t?String(R.tape.t).split(',').map(Number):[],ri:0,ti:0,mf:R.tape.mf||[],rec:R.rec,timers:[]}}
+  else{ps=coffeePlayers();k=ladInit().k;RP={mode:'rec',r:[],t:[],mf:[],timers:[]}}
   ({roulette:mountRoulette,snail:mountSnail,marble:mountMarble,draw:mountDraw}[S.game]||mountRoulette)(st,ctl,ps,k);
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1314,9 +1364,10 @@ function mountRoulette(st,ctl,ps,k){
     cx.beginPath();cx.arc(C[0],C[1],22,0,Math.PI*2);cx.fillStyle='#FFFFFF';cx.fill();cx.strokeStyle='#16202E';cx.lineWidth=3;cx.stroke();
     cx.beginPath();cx.moveTo(C[0]-13,2);cx.lineTo(C[0]+13,2);cx.lineTo(C[0],30);cx.closePath();cx.fillStyle='#16202E';cx.fill();
   }
-  function status(t){ctl.innerHTML=`<p class="gmsg">${t}</p><button type="button" class="btn primary gbig" id="rwSpin" ${spinning?'disabled':''}>${wins.length?'다음 사람 뽑기':'돌리기'}</button>`;$('rwSpin').onclick=spin}
-  function spin(){
-    if(spinning||!alive)return;
+  function status(t){ctl.innerHTML=`<p class="gmsg">${t}</p><button type="button" class="btn primary gbig" id="rwSpin" ${spinning||rpPlay()?'disabled':''}>${wins.length?'다음 사람 뽑기':'돌리기'}</button>`;$('rwSpin').onclick=()=>spin();
+    if(rpPlay()&&!spinning&&wins.length<k)rpLater(()=>spin(true),1100)}
+  function spin(auto){
+    if(spinning||!alive||(rpPlay()&&!auto))return;
     if(last!=null){rem.splice(last,1);last=null;draw()}
     spinning=true;status('돌아가는 중…');
     const m=rem.length,seg=Math.PI*2/m,t=rnd(m),frac=(15+rnd(71))/100;
@@ -1330,7 +1381,7 @@ function mountRoulette(st,ctl,ps,k){
     };
     raf=requestAnimationFrame(step);
   }
-  cv.addEventListener('click',spin);
+  cv.addEventListener('click',()=>spin());
   draw();status(`누가 걸릴까요? ${k>1?k+'번 돌려요':'한 번 돌려요'}`);
   S.gameStop=()=>{alive=false;cancelAnimationFrame(raf)};
 }
@@ -1343,14 +1394,14 @@ function mountSnail(st,ctl,ps,k){
   let alive=true,raf=0,timers=[];
   const n=ps.length,pos=Array(n).fill(0),spd=Array(n).fill(0),fin=[];
   const place=()=>ps.forEach((p,j)=>{const el=$('sn-'+p.i);if(!el)return;const w=el.parentNode.clientWidth-el.offsetWidth;el.style.transform=`translateX(${Math.max(0,w*Math.min(1,pos[j]))}px)`});
-  function status(t,btn){ctl.innerHTML=`<p class="gmsg">${t}</p>${btn?`<button type="button" class="btn primary gbig" id="snGo">출발!</button>`:''}`;if(btn)$('snGo').onclick=go}
+  function status(t,btn){ctl.innerHTML=`<p class="gmsg">${t}</p>${btn&&!rpPlay()?`<button type="button" class="btn primary gbig" id="snGo">출발!</button>`:''}`;if(btn){if(rpPlay())rpLater(go,900);else $('snGo').onclick=go}}
   async function go(){
     status('준비…');for(const t of ['3','2','1']){ctl.querySelector('.gmsg').textContent=t;await sleep(600);if(!alive)return}
     status('달려라!');
     const reroll=()=>{for(let j=0;j<n;j++){const r=rnd(100);spd[j]=r<8?0:r<14?0.30:0.035+rnd(100)/1000}};
-    reroll();let t0=performance.now(),tr=t0;const fast=reduceMotion()?4:1;
-    const step=now=>{if(!alive)return;const dt=Math.min(0.05,(now-t0)/1000)*fast;t0=now;
-      if(now-tr>450){reroll();tr=now}
+    reroll();let t0=performance.now(),acc=0;const fast=reduceMotion()?4:1;
+    const step=now=>{if(!alive)return;const dt=frameDt(Math.min(0.05,(now-t0)/1000)*fast);t0=now;
+      acc+=dt;if(acc>=0.45){reroll();acc=0}
       for(let j=0;j<n;j++){if(fin.includes(j))continue;pos[j]+=spd[j]*dt;if(pos[j]>=1){pos[j]=1;fin.push(j);const r=$('rk-'+ps[j].i);if(r){r.textContent=fin.length+'등';r.className='lrank in'}}}
       place();
       if(fin.length>=n-k){
@@ -1377,7 +1428,7 @@ function mountMarble(st,ctl,ps,k){
   segs.push([0,0,0,WH],[WW,0,WW,WH]);
   segs.push([0,120,165,175],[WW,120,235,175]);
   for(let r=0;r<7;r++){const y=215+r*32,off=r%2?20:0;for(let x=20+off;x<WW;x+=40)pegs.push([x+(rnd(7)-3),y,5])}
-  spins.push({x:115,y:480,L:62,w:2.2,a:rnd(628)/100},{x:285,y:480,L:62,w:-2.2,a:rnd(628)/100});
+  spins.push({x:115,y:480,L:62,w:2.2,a:rnd(628)/100},{x:285,y:480,L:62,w:-2.2,a:rnd(628)/100});spins.forEach(sp=>sp.a0=sp.a);
   bumps.push([200,565,24],[78,640,20],[322,640,20],[200,700,14]);
   segs.push([0,745,262,800],[WW,850,138,905]);
   for(let r=0;r<3;r++){const y=950+r*30,off=r%2?20:0;for(let x=30+off;x<WW-10;x+=44)pegs.push([x,y,5])}
@@ -1434,18 +1485,34 @@ function mountMarble(st,ctl,ps,k){
     cx.restore();
   }
   function side(){const el=$('mbSide');if(!el)return;el.innerHTML=fin.map((b,r)=>`<span class="mb-f"><i style="background:${b.col}"></i>${r+1}. ${esc(b.p.nm)}</span>`).join('')}
-  let last=0;
-  function loop(now){if(!alive)return;const dt=Math.min(0.033,(now-last)/1000||0);last=now;
-    if(running){const sub=6;for(let i=0;i<sub;i++)physics(dt/sub);side();
+  let last=0,nextS=0,pt=0;const MF=0.05,play=rpPlay(),mf=play?RP.mf:null,recOn=RP&&RP.mode==='rec';
+  const snap=()=>{while(t>=nextS){RP.mf.push(balls.map(b=>b.done?'':Math.round(b.x)+' '+Math.round(b.y)).join(','));nextS+=MF}};
+  function playFrame(dt){/* 기록된 위치로 그리기 */
+    pt+=dt;t=pt;spins.forEach(sp=>sp.a=sp.a0+sp.w*pt);
+    const f=pt/MF,i=Math.min(mf.length-1,Math.floor(f)),u=Math.min(1,f-i);
+    const A0=String(mf[i]||'').split(','),B0=String(mf[Math.min(mf.length-1,i+1)]||'').split(',');
+    balls.forEach((b,j)=>{const a=A0[j],c=B0[j];
+      if(!a){if(!b.done){b.done=true;fin.push(b)}return}
+      const [ax,ay]=a.split(' ').map(Number);if(c){const [cx2,cy2]=c.split(' ').map(Number);b.x=ax+(cx2-ax)*u;b.y=ay+(cy2-ay)*u}else{b.x=ax;b.y=ay}});
+    if(i>=mf.length-1){running=false;ended=true;const R=RP.rec;
+      const left=balls.filter(b=>(R.losers||[]).includes(b.p.nm));
+      const rest=(R.d&&R.d.rank||[]).map(nm=>balls.find(b=>b.p.nm===nm)).filter(b=>b&&!b.done);
+      rest.forEach(b=>{b.done=true;fin.push(b)});balls.filter(b=>!b.done&&!left.includes(b)).forEach(b=>{b.done=true;fin.push(b)});
+      ctl.innerHTML=`<p class="gmsg">끝까지 못 내려온 ${k}명이 커피!</p>`;gameDone((R.losers||[]).slice());side()}
+  }
+  function loop(now){if(!alive)return;const raw=Math.min(0.033,(now-last)/1000||0);last=now;
+    if(running&&play){playFrame(raw);side()}
+    else if(running){const dt=frameDt(raw);if(recOn)snap();const sub=6;for(let i=0;i<sub;i++)physics(dt/sub);if(recOn)snap();side();
       if(fin.length>=ps.length-k||t>75){running=false;ended=true;
         const left=balls.filter(b=>!b.done).sort((a,b)=>a.y-b.y).slice(0,k);
         const forced=balls.filter(b=>!b.done&&!left.includes(b)).sort((a,b)=>b.y-a.y);const timeout=forced.length>0;
         forced.forEach(b=>{b.done=true;fin.push(b)});
         ctl.innerHTML=`<p class="gmsg">끝까지 못 내려온 ${k}명이 커피!</p>`;gameDone(left.map(b=>b.p.nm),{rank:fin.map(b=>b.p.nm),forced:forced.map(b=>b.p.nm),timeout});side()}}
-    else if(ended)t+=dt;
+    else if(ended)t+=raw;
     drawBalls();raf=requestAnimationFrame(loop)}
   ctl.innerHTML=`<p class="gmsg">마지막으로 떨어지는 ${k}명이 커피를 사요.</p><button type="button" class="btn primary gbig" id="mbGo">떨어뜨리기</button>`;
-  $('mbGo').onclick=async()=>{ctl.innerHTML=`<p class="gmsg">준비…</p>`;for(const c of ['3','2','1']){count=c;await sleep(550);if(!alive)return}count=null;ctl.innerHTML=`<p class="gmsg">떨어지는 중…</p>`;running=true};
+  const goM=async()=>{ctl.innerHTML=`<p class="gmsg">준비…</p>`;for(const c of ['3','2','1']){count=c;await sleep(550);if(!alive)return}count=null;ctl.innerHTML=`<p class="gmsg">떨어지는 중…</p>`;running=true};
+  if(play){$('mbGo').remove();rpLater(goM,900)}else $('mbGo').onclick=goM;
   raf=requestAnimationFrame(loop);
   S.gameStop=()=>{alive=false;cancelAnimationFrame(raf)};
 }
@@ -1458,7 +1525,7 @@ function mountDraw(st,ctl,ps,k){
   let turn=0;const picked={},wins=[],picks=[];let over=false;
   st.innerHTML=`<div class="cards" style="grid-template-columns:repeat(${n<=4?n:n<=9?3:4},minmax(0,1fr))">${deck.map((_,i)=>`<button type="button" class="dcard" id="dc-${i}" aria-label="${i+1}번 카드"><span class="back">${i+1}</span><span class="front"></span></button>`).join('')}</div>`;
   function status(){if(over)return;const p=ps[turn];const c=pColor(p.nm,p.i);ctl.innerHTML=`<p class="gmsg"><span class="pchip" style="--pc:${c[0]};--pt:${c[1]}">${esc(p.nm)}</span> 님 차례예요. 카드를 한 장 골라요.</p>`}
-  deck.forEach((win,i)=>{$('dc-'+i).onclick=()=>{
+  const pick=i=>{const win=deck[i];
     if(over||picked[i]!=null)return;const p=ps[turn];picked[i]=p;const el=$('dc-'+i);
     el.querySelector('.front').innerHTML=`<b>${esc(p.nm)}</b>${win?`<span class="win">${ic('cup',18)}커피</span>`:'<span>통과</span>'}`;
     el.classList.add('open');if(win){el.classList.add('hit');wins.push(p.nm)}picks.push({nm:p.nm,card:i+1,win:!!win});
@@ -1467,8 +1534,10 @@ function mountDraw(st,ctl,ps,k){
       deck.forEach((w,j)=>{if(picked[j]==null){const e=$('dc-'+j);e.classList.add('open','rest');e.querySelector('.front').innerHTML=w?`<span class="win">${ic('cup',18)}커피</span>`:'<span>통과</span>'}});
       gameDone(wins,{picks})}
     else status();
-  }});
+  };
+  deck.forEach((w,i)=>{$('dc-'+i).onclick=()=>{if(!rpPlay())pick(i)}});
   status();
+  if(rpPlay()){const seq=((RP.rec.d&&RP.rec.d.picks)||[]).map(x=>x.card-1);let q=0;const nxt=()=>{if(over||q>=seq.length)return;pick(seq[q++]);rpLater(nxt,1100)};rpLater(nxt,1000)}
 }
 function vMenu(){
   return `
@@ -1516,7 +1585,7 @@ function render(){
   if(v==='cal')bindSwipe();
   saveLoc();
 }
-function go(v){stopGame();if(v==='play')S.playDirty=true;S.view=v;render();window.scrollTo(0,0)}
+function go(v){stopGame();if(v!=='play'&&v!=='ladder'){S.replay=null;RP=null}clearTimeout(S.rpT);if(v==='play')S.playDirty=true;S.view=v;render();window.scrollTo(0,0)}
 
 function bindSwipe(){
   const g=$('calGrid');if(!g)return;let x0=null,y0=null;
@@ -1987,10 +2056,12 @@ const A={
   'lad-run':t=>{const L=S.lad,G=L&&L.game;if(!G)return;const i=Number(t.dataset.i);if(!G.all&&!G.shown.includes(i))G.shown.push(i);L.anim=i;render();
     const ms=matchMedia('(prefers-reduced-motion:reduce)').matches?0:1500;clearTimeout(L.timer);L.timer=setTimeout(()=>{if(S.lad.anim===i){S.lad.anim=null;if(S.view==='ladder')render()}},ms)},
   'lad-all':()=>{const L=S.lad;if(!L||!L.game)return;L.game.all=true;L.anim=null;render()},
-  'cf-open':t=>{const r=(S.coffee||[]).find(x=>String(x.at)===t.dataset.at);if(!r)return;openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r))},
+  'cf-open':t=>{const r=(S.coffee||[]).find(x=>String(x.at)===t.dataset.at);if(!r)return;openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r));const b=$('cfReplay');if(b)b.onclick=()=>{closeSheet();startReplay(r)}},
+  'cf-lad-again':()=>{const G=S.lad&&S.lad.game;if(G&&G.replay)startReplay(G.replay)},
   'cf-del':t=>{const k=t.dataset.at;clearTimeout(S.cfAskT);
     if(S.cfAsk!==k){S.cfAsk=k;render();S.cfAskT=setTimeout(()=>{S.cfAsk=null;render()},4000);return}
-    S.cfAsk=null;const log=k==='all'?[]:(S.coffee||[]).filter(r=>String(r.at)!==k);S.coffee=log;render();toast(k==='all'?'결과를 모두 지웠어요':'결과를 지웠어요');
+    S.cfAsk=null;const gone=(S.coffee||[]).filter(r=>k==='all'||String(r.at)===k);if(db)gone.forEach(r=>{if(r.rp)db.doc('settings/cfr-'+r.at).delete().catch(()=>{})});
+    const log=k==='all'?[]:(S.coffee||[]).filter(r=>String(r.at)!==k);S.coffee=log;render();toast(k==='all'?'결과를 모두 지웠어요':'결과를 지웠어요');
     if(db)db.doc('settings/coffee').set({log}).catch(()=>toast('지우지 못했어요'))},
   'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);store.set('hj.meSet','1');toast(S.me?'저장했어요':'이름을 지웠어요');render()},
   'weather':()=>openWeather()
