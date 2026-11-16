@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.9.0">
+<meta name="app-version" content="1.10.0">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -427,6 +427,21 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
 .cf-more{color:var(--accent,#2563EB);font-weight:600}
 .cfd{display:flex;flex-direction:column;gap:14px}
+.ac{position:relative}
+.ac-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(15,23,42,.18);max-height:300px;overflow:auto;padding:4px}
+.ac-opt{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:2px;width:100%;padding:10px 12px;border-radius:9px;cursor:pointer}
+.ac-opt:hover,.ac-opt:focus-visible{background:var(--sunken)}
+.ac-opt b{font-size:15px}.ac-opt .small{color:var(--muted);overflow-wrap:anywhere}
+.ac-opt.free .small{color:var(--fg-2)}
+.units{display:flex;flex-direction:column;gap:6px}
+.units:empty{display:none}
+.unit{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--sunken);border:1px solid var(--line-soft)}
+.unit .txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.unit .txt .small{overflow-wrap:anywhere}
+.eq-pv{overflow:auto;border:1px solid var(--line);border-radius:10px}
+.eq-pv table{border-collapse:collapse;font-size:13px;min-width:100%}
+.eq-pv th,.eq-pv td{padding:6px 8px;border-bottom:1px solid var(--line-soft);text-align:left;white-space:nowrap}
+.eq-pv th{background:var(--sunken);font-weight:700}
 @media (max-width:420px){.xl-b .xl-t{display:none}.xl-b{padding-left:10px;padding-right:10px}}
 .rp-badge{flex:none;align-self:center;padding:4px 10px;border-radius:999px;background:#F39A2B;color:#fff;font-size:13px;font-weight:700}
 .cfd-sum{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:#FFF4E5;color:#5A3000}
@@ -646,7 +661,7 @@ const safeUrl=u=>/^https?:\/\//i.test(String(u||''))?u:'';
 const now=new Date();
 const OPENP=new Set(); /* 같은 날 같은 사람 일정 펼침 상태: '날짜|이름' */
 const S={
-  events:[],contacts:[],customers:{},requests:[],settings:{},coffee:[],
+  events:[],contacts:[],customers:{},requests:[],settings:{},coffee:[],equip:[],equipMeta:null,
   loading:true,live:false,readOnly:false,admin:false,
   view:'today',prev:'today',
   y:now.getFullYear(),m:now.getMonth(),sel:(now.getDay()===0||now.getDay()===6)?null:ymd(now),staffDraft:null,
@@ -756,7 +771,7 @@ function entRow(x,opts){
   const e=x.e;const xc=opts&&opts.cls?' '+opts.cls:'';
   const range=isTbd(e)?`${fmtShort(e.start)} 주 · 날짜 미정`:(e.end&&e.end!==e.start)?`${fmtShort(e.start)} – ${fmtShort(e.end)}`:'';
   const tag=S.readOnly?'div':'button';
-  const eq=(e.equipment||[]);
+  const eq=(e.equipment||[]).concat((e.units||[]).map(u=>u.h).filter(Boolean));
   return `<${tag} ${tag==='button'?'type="button" data-act="edit-ev" data-id="'+esc(e.id)+'"':''} class="ev-row${xc}${isLeave(e)?' leave':''}">
     <span class="pchip" style="${pst(x.p)}">${esc(x.p)}</span>
     <span class="body">
@@ -1547,6 +1562,7 @@ function vMenu(){
   <div class="vh"><div class="grow"><h1>메뉴</h1></div></div>
   <div class="menu-grid">
     ${staffEditor()}
+    ${eqCard()}
     <section class="card" aria-labelledby="meH"><div class="card-h"><h2 id="meH">내 이름</h2></div>
       <p class="small muted" style="margin:0">일정 담당자와 요청 작성자 칸에 미리 채워져요. 이 기기에만 저장돼요.</p>
       <div class="rowline"><input class="inp" id="meName" data-keep value="${esc(S.me)}" placeholder="이름" autocomplete="off" aria-label="내 이름" style="flex:1;min-width:8em"><button type="button" class="btn primary" data-act="save-me">저장</button></div>
@@ -1702,23 +1718,29 @@ function zipStore(files){/* 압축 없이 묶는 zip (xlsx 용) */
   const csz=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csz,true);e.setUint32(16,off,true);
   return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
-function xlsxBlob(sheetName,head,rows,widths){
+function xlsxBlob(sheetName,head,rows,widths){return xlsxBook([{name:sheetName,head,rows,widths}])}
+function xlSheetXml(head,rows,widths){
   const cell=(v,r,c,st)=>{const ref=xCol(c)+r;if(typeof v==='number')return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`};
   const all=[head,...rows],last=xCol(head.length-1)+all.length;
   const sd=all.map((row,ri)=>`<row r="${ri+1}">${row.map((v,ci)=>cell(v,ri+1,ci,ri?2:1)).join('')}</row>`).join('');
   const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${last}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="16.5"/><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData>${rows.length?`<autoFilter ref="A1:${last}"/>`:''}</worksheet>`;
-  const sn=xEsc(sheetName);
-  return zipStore([
-    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
-    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
-    ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sn}" sheetId="1" r:id="rId1"/></sheets>${rows.length?`<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${sn}'!$A$1:$${xCol(head.length-1)}$${all.length}</definedName></definedNames>`:''}</workbook>`],
-    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
-    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EAF5"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC9D1DC"/></left><right style="thin"><color rgb="FFC9D1DC"/></right><top style="thin"><color rgb="FFC9D1DC"/></top><bottom style="thin"><color rgb="FFC9D1DC"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
-    ['xl/worksheets/sheet1.xml',sheet]
-  ]);
+  return sheet;
 }
-const XL_HEAD=['시작일','요일','종료일','일수(평일)','담당자','구분','고객사','사이트','고객 담당자','작업내용','메모'];
-const XL_W=[12,6,12,10,9,12,16,16,14,40,30];
+function xlsxBook(sheets){
+  const used={};const nm=x=>{let n=String(x||'시트').replace(/[\\/?*\[\]:]/g,' ').slice(0,31)||'시트';while(used[n])n=n.slice(0,28)+'_'+(Object.keys(used).length+1);used[n]=1;return n};
+  const sh=sheets.map((q,i)=>({...q,nm:nm(q.name),i:i+1}));
+  const files=[
+    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+sh.map(q=>`<Override PartName="/xl/worksheets/sheet${q.i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sh.map(q=>`<sheet name="${xEsc(q.nm)}" sheetId="${q.i}" r:id="rId${q.i}"/>`).join('')}</sheets>${sh.some(q=>q.rows.length)?`<definedNames>${sh.filter(q=>q.rows.length).map(q=>`<definedName name="_xlnm._FilterDatabase" localSheetId="${q.i-1}" hidden="1">'${xEsc(q.nm)}'!$A$1:$${xCol(q.head.length-1)}$${q.rows.length+1}</definedName>`).join('')}</definedNames>`:''}</workbook>`],
+    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sh.map(q=>`<Relationship Id="rId${q.i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${q.i}.xml"/>`).join('')+`<Relationship Id="rId${sh.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EAF5"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC9D1DC"/></left><right style="thin"><color rgb="FFC9D1DC"/></right><top style="thin"><color rgb="FFC9D1DC"/></top><bottom style="thin"><color rgb="FFC9D1DC"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>']
+  ];
+  sh.forEach(q=>files.push([`xl/worksheets/sheet${q.i}.xml`,xlSheetXml(q.head,q.rows,q.widths)]));
+  return zipStore(files);
+}
+const XL_HEAD=['시작일','요일','종료일','일수(평일)','담당자','구분','고객사','사이트','고객 담당자','호기','S/N','작업내용','메모'];
+const XL_W=[12,6,12,10,9,12,16,16,14,16,16,40,30];
 function xlRows(from,to,ppl){
   const custTxt=p=>p.customer==='기타'?(p.customerName||'기타'):(p.customer||'');
   const out=[];
@@ -1730,9 +1752,155 @@ function xlRows(from,to,ppl){
       out.push({k:st,r:rankOf(p),row:[st,WD[new Date(st+'T00:00:00').getDay()],en,tb?'':wd,p,
         isLeave(e)?leaveOf(e):(tb?'업무(날짜 미정)':'업무'),
         isLeave(e)?'':ps.map(custTxt).join(' / '),isLeave(e)?'':ps.map(x=>x.site||'').join(' / '),
-        e.contact||'',e.work||((e.equipment||[]).join(', '))||'',e.memo||'']})});
+        e.contact||'',(e.units||[]).map(u=>u.h).join(', '),(e.units||[]).map(u=>u.s||'-').join(', '),e.work||((e.equipment||[]).join(', '))||'',e.memo||'']})});
   });
   return out.sort((a,b)=>a.k.localeCompare(b.k)||(a.r-b.r)).map(x=>x.row);
+}
+/* ---------- 장비 목록 (settings/equip 메타 + settings/equip-0.. 나눠 저장) ---------- */
+const EQ_CHUNK=2000;
+function docOnce(path){
+  return new Promise(res=>{if(!db){res(null);return}let un=null,done=false;const fin=v=>{if(done)return;done=true;try{un&&un()}catch(e){}res(v)};
+    try{un=db.doc(path).onSnapshot(sn=>{const d=sn&&sn.data&&sn.data();if(d||!(sn&&sn.metadata&&sn.metadata.fromCache))fin(d||null)},()=>fin(null))}catch(e){fin(null)}
+    setTimeout(()=>fin(null),10000)});
+}
+async function equipMetaIn(d){
+  S.equipMeta=d&&d.count?d:null;
+  if(!S.equipMeta){if(S.equip.length){S.equip=[];render()}return}
+  if(S.equipAt===d.at)return;S.equipAt=d.at;
+  const parts=await Promise.all([...Array(d.chunks||0).keys()].map(i=>docOnce('settings/equip-'+i)));
+  if(S.equipAt!==d.at)return;
+  S.equip=parts.flatMap(x=>(x&&Array.isArray(x.rows))?x.rows:[]);render();
+}
+const eqKey=v=>String(v||'').toUpperCase().replace(/[\s\-_]/g,'');
+function eqFind(q,sites){
+  const k=eqKey(q);if(!k)return [];
+  const hits=S.equip.filter(r=>eqKey(r.h).includes(k)||eqKey(r.s)===k);
+  const st=(sites||[]).map(x=>String(x).replace(/\s/g,''));
+  const sc=r=>(eqKey(r.h)===k?0:eqKey(r.h).startsWith(k)?1:2)*2+(st.length&&st.some(x=>x&&String(r.c).replace(/\s/g,'').includes(x))?0:1);
+  return hits.sort((a,b)=>sc(a)-sc(b)||String(a.h).localeCompare(String(b.h))).slice(0,8);
+}
+/* 엑셀(.xlsx) 읽기: 첫 시트 중 K열 값이 가장 많은 시트, 셀은 글자로 */
+async function unzipXlsx(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf);let e=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-66000);i--)if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+  if(e<0)throw new Error('엑셀(.xlsx) 파일이 아니에요');
+  const n=dv.getUint16(e+10,true);let off=dv.getUint32(e+16,true);const out={};const dec=new TextDecoder();
+  for(let k=0;k<n;k++){
+    if(dv.getUint32(off,true)!==0x02014b50)break;
+    const meth=dv.getUint16(off+10,true),csz=dv.getUint32(off+20,true),nl=dv.getUint16(off+28,true),xl=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true),lo=dv.getUint32(off+42,true);
+    const name=dec.decode(u8.subarray(off+46,off+46+nl));off+=46+nl+xl+cl;
+    if(!/^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml|worksheets\/[^/]+\.xml)$/.test(name))continue;
+    const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);const raw=u8.subarray(ds,ds+csz);
+    let data;
+    if(meth===0)data=raw;
+    else if(meth===8){if(typeof DecompressionStream==='undefined')throw new Error('이 브라우저에서는 엑셀을 읽을 수 없어요. PC 크롬에서 올려 주세요');
+      data=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}
+    else continue;
+    out[name]=dec.decode(data);
+  }
+  return out;
+}
+const colIdx=ref=>{const m=/^([A-Z]+)/.exec(ref||'');if(!m)return -1;let n=0;for(const ch of m[1])n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function readXlsx(file){
+  const z=await unzipXlsx(await file.arrayBuffer());const P=x=>new DOMParser().parseFromString(x,'application/xml');
+  const tx=el=>[...el.getElementsByTagName('t')].map(t=>t.textContent).join('');
+  const ss=z['xl/sharedStrings.xml']?[...P(z['xl/sharedStrings.xml']).getElementsByTagName('si')].map(tx):[];
+  const sheets=[];
+  if(z['xl/workbook.xml']&&z['xl/_rels/workbook.xml.rels']){
+    const rel={};[...P(z['xl/_rels/workbook.xml.rels']).getElementsByTagName('Relationship')].forEach(r=>rel[r.getAttribute('Id')]=r.getAttribute('Target'));
+    [...P(z['xl/workbook.xml']).getElementsByTagName('sheet')].forEach(sh=>{const id=sh.getAttribute('r:id')||sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+      let t=rel[id]||'';t=t.replace(/^\/?xl\//,'').replace(/^\//,'');sheets.push({name:sh.getAttribute('name'),path:'xl/'+t})});
+  }
+  if(!sheets.length)Object.keys(z).filter(k=>k.startsWith('xl/worksheets/')).sort().forEach((k,i)=>sheets.push({name:'시트'+(i+1),path:k}));
+  const res=sheets.filter(q=>z[q.path]).map(q=>{
+    const rows=[];[...P(z[q.path]).getElementsByTagName('row')].forEach(r=>{const arr=[];
+      [...r.getElementsByTagName('c')].forEach(c=>{const i=colIdx(c.getAttribute('r'));if(i<0)return;const t=c.getAttribute('t');const v=c.getElementsByTagName('v')[0];
+        let val='';if(t==='s')val=ss[+(v&&v.textContent)]||'';else if(t==='inlineStr')val=tx(c);else val=v?v.textContent:'';arr[i]=String(val).trim()});
+      rows.push(arr)});
+    return {name:q.name,rows};
+  });
+  if(!res.length)throw new Error('시트를 찾지 못했어요');
+  return res.sort((a,b)=>b.rows.filter(r=>r[10]).length-a.rows.filter(r=>r[10]).length)[0];
+}
+/* A 회사명, B 담당자, C 장비 위치, D Product, E S/N, K 호기 */
+function eqFromSheet(rows){
+  const out=[];let lastA='';
+  rows.forEach((r,i)=>{r=r||[];const g=j=>String(r[j]||'').trim();
+    const A=g(0),E=g(4),K=g(10);
+    if(i<10&&(/호기|^s\/?n$|serial|시리얼/i.test(K+' '+E)||/^회\s*사$/.test(A))){lastA='';return}
+    if(A)lastA=A;
+    if(!E&&!K)return;
+    out.push({c:A||lastA,m:g(1),l:g(2),p:g(3),s:E,h:K});
+  });
+  return out;
+}
+async function eqSave(rows,file){
+  if(!db)throw new Error('공유 저장소에 연결되지 않았어요');
+  const old=S.equipMeta&&S.equipMeta.chunks||0,chunks=Math.ceil(rows.length/EQ_CHUNK),at=Date.now();
+  for(let i=0;i<chunks;i++)await db.doc('settings/equip-'+i).set({rows:rows.slice(i*EQ_CHUNK,(i+1)*EQ_CHUNK)});
+  for(let i=chunks;i<old;i++)await db.doc('settings/equip-'+i).delete().catch(()=>{});
+  const meta={count:rows.length,chunks,at,file:file||'',by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};
+  await db.doc('settings/equip').set(meta);
+  S.equipAt=at;S.equipMeta=meta;S.equip=rows;render();
+}
+async function eqClear(){
+  const old=S.equipMeta&&S.equipMeta.chunks||0;
+  if(db){for(let i=0;i<old;i++)await db.doc('settings/equip-'+i).delete().catch(()=>{});await db.doc('settings/equip').set({count:0,chunks:0,at:Date.now()})}
+  S.equipMeta=null;S.equip=[];S.equipAt=null;render();
+}
+function eqUpload(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    let sh,rows;try{toast('엑셀을 읽는 중…');sh=await readXlsx(f);rows=eqFromSheet(sh.rows)}catch(err){toast(err.message||'엑셀을 읽지 못했어요');return}
+    if(!rows.length){toast('E열(S/N)이나 K열(호기)에 값이 있는 줄을 찾지 못했어요');return}
+    const pv=rows.slice(0,5);
+    openSheet(`<div class="sb">
+      <p style="margin:0"><b>${esc(f.name)}</b> · 「${esc(sh.name)}」 시트에서 장비 <b>${rows.length}대</b>를 찾았어요.</p>
+      <div class="eq-pv"><table><thead><tr><th>회사명</th><th>담당자</th><th>위치</th><th>Product</th><th>S/N</th><th>호기</th></tr></thead><tbody>${pv.map(r=>`<tr><td>${esc(r.c)}</td><td>${esc(r.m)}</td><td>${esc(r.l)}</td><td>${esc(r.p)}</td><td>${esc(r.s)}</td><td>${esc(r.h)}</td></tr>`).join('')}</tbody></table></div>
+      ${rows.length>5?`<p class="small muted" style="margin:0">처음 5대만 보여요.</p>`:''}
+      <p class="small muted" style="margin:0">A 회사명 · B 담당자 · C 장비 위치 · D Product · E S/N · K 호기를 읽었어요. 회사명 칸이 비어 있으면(셀 병합) 바로 위 회사명을 써요.${S.equip.length?` 지금 있는 장비 목록 ${S.equip.length}대는 이 파일로 바뀌어요. 이미 일정에 적은 호기·S/N은 그대로 남아요.`:''}</p>
+      <p class="small" style="margin:0;color:#B45309">로그인 기능이 생기기 전에는 사이트 주소를 아는 사람은 장비 목록을 볼 수 있어요.</p>
+      <div class="err" id="eqErr"></div>
+    </div><footer><button type="button" class="btn" data-close>취소</button><button type="button" class="btn primary grow" id="eqOk">${rows.length}대 저장</button></footer>`,'장비 목록 올리기','확인 후 저장하면 모두에게 공유돼요');
+    $('eqOk').onclick=async()=>{$('eqOk').disabled=true;try{await eqSave(rows,f.name);closeSheet();toast(`장비 ${rows.length}대를 저장했어요`)}catch(err){$('eqErr').textContent=failMsg?failMsg(err):String(err);$('eqOk').disabled=false}};
+  };
+  inp.click();
+}
+function eqCard(){
+  const m=S.equipMeta,n=S.equip.length;
+  const when=m&&m.at?(()=>{const d=new Date(m.at);return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`})():'';
+  const ask=S.eqAsk;
+  return `<section class="card" aria-labelledby="eqH"><div class="card-h"><h2 id="eqH">장비 목록</h2></div>
+    <p class="small" style="margin:0;color:var(--fg-2)">${n?`<b>${n}대</b> 등록됨${m&&m.file?` · ${esc(m.file)}`:''}${when?` · ${when}`:''}${m&&m.by?` · ${esc(m.by)}`:''}`:'아직 없어요. 장비 엑셀(.xlsx)을 올리면 일정 입력의 「호기」 칸에서 찾아 고를 수 있어요.'}</p>
+    <p class="small muted" style="margin:0">읽는 열: A 회사명 · B 담당자 · C 장비 위치 · D Product · E S/N · K 호기</p>
+    ${S.readOnly?'':`<button type="button" class="btn" data-act="eq-up">${ic('up',18)}${n?'장비 엑셀 다시 올리기':'장비 엑셀 올리기'}</button>`}
+    <button type="button" class="btn" data-act="xlsx">${ic('down',18)}장비별 작업 이력 받기</button>
+    ${n&&!S.readOnly?`<button type="button" class="btn sm${ask?' danger':' ghost'}" data-act="eq-clear">${ask?'정말 장비 목록 지우기':'장비 목록 지우기'}</button>`:''}
+  </section>`;
+}
+/* 장비별 작업 이력 */
+function eqWorks(from,to,ppl){
+  const out=[];
+  S.events.forEach(e=>{if(isLeave(e)||!(e.units||[]).length)return;const st=e.start,en=e.end||e.start;if(!st||en<from||st>to)return;
+    const who=splitP(e.person).filter(p=>!ppl.length||ppl.includes(p));if(!who.length)return;
+    e.units.forEach(u=>out.push({e,u,who}))});
+  return out.sort((a,b)=>String(a.e.start).localeCompare(String(b.e.start)));
+}
+function eqHistDownload(from,to,ppl){
+  const W=eqWorks(from,to,ppl);
+  const keyOf=r=>r.s?'s:'+eqKey(r.s):'h:'+eqKey(r.h);
+  const map=new Map();S.equip.forEach(r=>{const k=keyOf(r);if(!map.has(k))map.set(k,{r,ws:[]})});
+  W.forEach(w=>{let k=keyOf(w.u);if(!map.has(k)){const alt=[...map.values()].find(x=>eqKey(x.r.h)&&eqKey(x.r.h)===eqKey(w.u.h));if(alt)k=keyOf(alt.r);else map.set(k,{r:{c:w.u.c||'',m:w.u.m||'',l:w.u.l||'',p:w.u.p||'',s:w.u.s||'',h:w.u.h||''},ws:[],extra:true})}map.get(k).ws.push(w)});
+  const dt=e=>isTbd(e)?`${e.start} 주(날짜 미정)`:(e.end&&e.end!==e.start?`${e.start}~${e.end}`:e.start);
+  const line=w=>`${dt(w.e)} ${w.who.join(', ')}${w.e.work?' · '+w.e.work:''}${w.e.memo?' · 메모: '+w.e.memo.replace(/\s*\n\s*/g,' / '):''}`;
+  const h1=['회사명','담당자','장비 위치','Product','S/N','호기','작업 횟수','최근 작업일','작업 이력 (날짜 · 한 사람 · 작업내용 · 메모)','비고'];
+  const r1=[...map.values()].map(x=>[x.r.c,x.r.m,x.r.l,x.r.p,x.r.s,x.r.h,x.ws.length,x.ws.length?x.ws[x.ws.length-1].e.start:'',x.ws.map(line).join('\n'),x.extra?'장비 목록에 없는 호기':'']);
+  const h2=['시작일','요일','종료일','호기','S/N','Product','회사명','장비 위치','한 사람','방문 고객사/사이트','작업내용','메모'];
+  const r2=W.map(w=>{const m=map.get(keyOf(w.u))||[...map.values()].find(x=>x.ws.includes(w))||{r:w.u};const r=m.r;
+    return [w.e.start,WD[new Date(w.e.start+'T00:00:00').getDay()],w.e.end||w.e.start,w.u.h||r.h||'',w.u.s||r.s||'',r.p||w.u.p||'',r.c||w.u.c||'',r.l||w.u.l||'',w.who.join(', '),rptPlace(w.e),w.e.work||'',w.e.memo||'']});
+  const blob=xlsxBook([{name:'장비별 이력',head:h1,rows:r1,widths:[16,10,16,12,14,14,9,12,70,18]},{name:'작업 목록',head:h2,rows:r2,widths:[12,6,12,14,14,12,16,16,12,20,36,30]}]);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`hanbit_equipment_${from.replace(/-/g,'')}-${to.replace(/-/g,'')}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast(`장비별 작업 이력을 받았어요 (작업 ${W.length}건)`);
 }
 function openXlsx(){
   const mStart=(y,m)=>ymd(new Date(y,m,1)),mEnd=(y,m)=>ymd(new Date(y,m+1,0));
@@ -1744,7 +1912,9 @@ function openXlsx(){
     <div class="rowline" id="xlCustom" hidden><div class="f" style="flex:1"><label for="xlFrom">시작</label><input type="date" id="xlFrom"></div><div class="f" style="flex:1"><label for="xlTo">끝</label><input type="date" id="xlTo"></div></div>
     <div class="f"><span class="lab">사람 (아무도 안 고르면 전체)</span><div class="picks" id="xlPpl"></div></div>
     <p class="small muted" id="xlInfo" style="margin:0"></p>
-    <button type="button" class="btn primary" id="xlGo">${ic('down',18)}엑셀 파일 받기 (.xlsx)</button>
+    <button type="button" class="btn primary" id="xlGo">${ic('down',18)}일정 엑셀 받기 (.xlsx)</button>
+    <button type="button" class="btn" id="xlEq">${ic('down',18)}장비별 작업 이력 받기 (.xlsx)</button>
+    <p class="small muted" id="xlEqInfo" style="margin:0"></p>
     <p class="small muted" style="margin:0">파일은 이 기기에서 바로 만들어지고 다른 곳으로 보내지지 않아요. 한 사람이 여러 명과 같이 간 일정은 사람마다 한 줄씩 나와요.</p>
   </div>`,'일정 엑셀로 받기','누가 · 언제 · 어디서 · 무슨 작업');
   const all=()=>{const ds=S.events.map(e=>e.start).filter(Boolean).sort();const de=S.events.map(e=>e.end||e.start).filter(Boolean).sort();return [ds[0]||ymd(t),de[de.length-1]||ymd(t)]};
@@ -1760,9 +1930,13 @@ function openXlsx(){
     const bad=st.from>st.to,n=bad?0:xlRows(st.from,st.to,st.ppl).length;
     $('xlInfo').textContent=bad?'시작이 끝보다 늦어요.':`${st.from.replace(/-/g,'.')} ~ ${st.to.replace(/-/g,'.')} · ${st.ppl.length?st.ppl.join(', '):'전체'} · ${n}줄`;
     $('xlGo').disabled=bad||!n;
+    const hn=bad?0:eqWorks(st.from,st.to,st.ppl).length;
+    $('xlEq').disabled=bad||(!S.equip.length&&!hn);
+    $('xlEqInfo').textContent=S.equip.length?`장비 목록 ${S.equip.length}대 기준 · 이 기간 호기가 적힌 작업 ${hn}건`:'장비 목록이 아직 없어요. 메뉴 › 장비 목록에서 엑셀을 먼저 올려 주세요.'+(hn?` (호기가 적힌 작업 ${hn}건은 받을 수 있어요)`:'');
   };
   $('xlMode').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{st.mode=b.dataset.m;draw()});
   $('xlFrom').onchange=$('xlTo').onchange=()=>{st.mode='custom';draw()};
+  $('xlEq').onclick=()=>eqHistDownload(st.from,st.to,st.ppl);
   $('xlGo').onclick=()=>{
     const rows=xlRows(st.from,st.to,st.ppl);if(!rows.length)return;
     const blob=xlsxBlob('일정',XL_HEAD,rows,XL_W);
@@ -1836,7 +2010,7 @@ function openEventSheet(ev,date){
   const isEdit=!!ev;
   const names=staff().map(p=>p.name);
   const given=ev?splitP(ev.person):[]; /* 새 일정은 담당자 선택 없이 시작 */
-  const st={pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n)),kind:ev&&isLeave(ev)?leaveOf(ev):'업무',
+  const st={units:ev&&Array.isArray(ev.units)?ev.units.map(u=>({...u})):[],pl:ev?placesOf(ev).map(p=>({...p})):[],eq:ev?[...(ev.equipment||[])]:[],ppl:given.filter(n=>names.includes(n)),kind:ev&&isLeave(ev)?leaveOf(ev):'업무',
     tbd:!!(ev&&isTbd(ev)),mon:weekMon(parse(ev&&isTbd(ev)?ev.start:(date||todayStr())))};
   const others=given.filter(n=>!names.includes(n)).join(', ');
   const d=date||todayStr();
@@ -1849,6 +2023,9 @@ function openEventSheet(ev,date){
     <div id="fWorkBox" class="fbox">
     <div class="f"><span class="lab">방문 고객사 (여러 곳 선택 가능, 누른 순서대로)</span><div class="picks" id="fCust"></div><div class="plist" id="fPlaces"></div></div>
     <div class="f"><label for="fContact">고객 담당자 (선택)</label><input id="fContact" placeholder="예: 장민준 — 미팅 안건 메일에 괄호로 들어가요" autocomplete="off" value="${esc(ev?ev.contact||'':'')}"></div>
+    <div class="f"><label for="fUnit">호기 (선택 · 여러 대 가능)</label>
+      <div class="ac"><input id="fUnit" placeholder="${S.equip.length?'예: ETH208 — 치면 장비 목록에서 찾아요':'호기 입력 (장비 목록을 올리면 자동으로 찾아요)'}" autocomplete="off" autocapitalize="characters" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="fUnitList"><div class="ac-list" id="fUnitList" role="listbox" hidden></div></div>
+      <div class="units" id="fUnits"></div></div>
     <div class="f"><label for="fWork">작업내용</label><input id="fWork" placeholder="예: 정기 교정 4대, 긴급 수리" autocomplete="off" value="${esc(ev&&!isLeave(ev)?ev.work||'':'')}"></div>
     </div>
     <div class="f" id="fLeaveQuick"><span class="lab">사유 (선택)</span><div class="picks"><button type="button" class="pick" id="fWhy" aria-pressed="false">개인 사유에 의한 연차</button></div></div>
@@ -1883,6 +2060,27 @@ function openEventSheet(ev,date){
     $('siteList').innerHTML=used.map(x=>`<option value="${esc(x)}">`).join('');
   };
   picks();
+  /* 호기: 장비 목록에서 자동완성 → 고르면 S/N·Product·위치 표시 */
+  const uKey=u=>eqKey(u.s)+'|'+eqKey(u.h);
+  const unitsUI=()=>{$('fUnits').innerHTML=st.units.map((u,i)=>`<div class="unit"><div class="txt"><b>${esc(u.h||'(호기 없음)')}</b>${u.p?` <span class="muted">${esc(u.p)}</span>`:''}
+      <span class="small">S/N <b>${esc(u.s||'—')}</b>${u.c?` · ${esc(u.c)}`:''}${u.l?` · ${esc(u.l)}`:''}</span></div><button type="button" class="btn ghost sm" data-ur="${i}" aria-label="${esc(u.h)} 빼기">빼기</button></div>`).join('');
+    $('fUnits').querySelectorAll('[data-ur]').forEach(b=>b.onclick=()=>{st.units.splice(+b.dataset.ur,1);unitsUI()})};
+  let acHits=[];
+  const acClose=()=>{const l=$('fUnitList'),i=$('fUnit');if(l)l.hidden=true;if(i)i.setAttribute('aria-expanded','false')};
+  const acPick=u=>{if(!st.units.some(x=>uKey(x)===uKey(u)))st.units.push({h:u.h||'',s:u.s||'',p:u.p||'',c:u.c||'',l:u.l||'',m:u.m||''});$('fUnit').value='';acClose();unitsUI();$('fUnit').focus()};
+  const acDraw=()=>{const q=$('fUnit').value.trim();if(!q){acClose();return}
+    syncPl();acHits=eqFind(q,st.pl.flatMap(p=>splitP(p.site)));
+    const free=!acHits.some(r=>eqKey(r.h)===eqKey(q));
+    $('fUnitList').innerHTML=acHits.map((r,i)=>`<button type="button" class="ac-opt" role="option" data-ai="${i}"><b>${esc(r.h)}</b><span class="small">${[r.p,r.s?'S/N '+r.s:'',r.c,r.l].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')
+      +(free?`<button type="button" class="ac-opt free" role="option" data-af="1"><span class="small">${acHits.length?'':'장비 목록에 없어요 · '}「${esc(q)}」 그대로 넣기</span></button>`:'');
+    $('fUnitList').hidden=false;$('fUnit').setAttribute('aria-expanded','true');
+    $('fUnitList').querySelectorAll('[data-ai]').forEach(b=>b.onmousedown=b.onclick=ev2=>{ev2.preventDefault();acPick(acHits[+b.dataset.ai])});
+    const fb=$('fUnitList').querySelector('[data-af]');if(fb)fb.onmousedown=fb.onclick=ev2=>{ev2.preventDefault();acPick({h:q.toUpperCase()})};
+  };
+  $('fUnit').addEventListener('input',acDraw);
+  $('fUnit').addEventListener('keydown',ev2=>{if(ev2.key==='Enter'){ev2.preventDefault();ev2.stopPropagation();const q=$('fUnit').value.trim();if(!q)return;acPick(acHits[0]&&(eqKey(acHits[0].h).startsWith(eqKey(q))||acHits.length===1)?acHits[0]:{h:q.toUpperCase()})}else if(ev2.key==='Escape'){if(!$('fUnitList').hidden){ev2.stopPropagation();acClose()}}});
+  $('fUnit').addEventListener('blur',()=>setTimeout(acClose,150));
+  unitsUI();
   const WHY='개인 사유에 의한 연차';
   const whyUI=()=>$('fWhy').setAttribute('aria-pressed',$('fMemo').value.includes(WHY));
   const tbdUI=()=>{const on=st.tbd&&st.kind==='업무';$('fTbd').setAttribute('aria-pressed',on);$('fDates').hidden=on;$('fWeek').hidden=!on;$('fTbdBox').hidden=st.kind!=='업무';
@@ -1910,8 +2108,8 @@ function openEventSheet(ev,date){
     if(!leave&&st.pl.some(p=>p.customer==='기타'&&!String(p.customerName||'').trim()))return $('fErr').textContent='기타 고객사의 이름을 입력하세요.';
     const places=leave?[]:st.pl.map(p=>({customer:p.customer,customerName:p.customer==='기타'?String(p.customerName||'').trim():'',site:splitP(p.site).join(', ')}));
     const now=new Date().toISOString();
-    const data=leave?{person,start,end,kind:'leave',leaveType:st.kind,places:[],customer:'',customerName:'',site:'',equipment:[],tbd:false,contact:'',work:'',memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now}
-      :{person,start,end,kind:'work',leaveType:'',places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,tbd,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
+    const data=leave?{person,start,end,kind:'leave',leaveType:st.kind,places:[],customer:'',customerName:'',site:'',equipment:[],units:[],tbd:false,contact:'',work:'',memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now}
+      :{person,start,end,kind:'work',leaveType:'',places,customer:places[0].customer,customerName:places[0].customerName,site:places[0].site,tbd,equipment:st.eq /* 장비 입력은 빠짐: 예전 일정의 장비 값은 그대로 둠 */,units:st.units,contact:$('fContact').value.trim(),work:$('fWork').value.trim(),memo:$('fMemo').value.trim(),updatedAt:now,createdAt:ev?(ev.createdAt||now):now};
     $('fSave').disabled=true;
     try{
       if(isEdit)await dbSet('schedules',ev.id,data);else await dbAdd('schedules',data);
@@ -2138,6 +2336,8 @@ const A={
     ladSort();ladSave();render()},
   'report':()=>openReport(),
   'xlsx':()=>openXlsx(),
+  'eq-up':()=>eqUpload(),
+  'eq-clear':()=>{clearTimeout(S.eqAskT);if(!S.eqAsk){S.eqAsk=true;render();S.eqAskT=setTimeout(()=>{S.eqAsk=false;render()},4000);return}S.eqAsk=false;eqClear().then(()=>toast('장비 목록을 지웠어요')).catch(()=>toast('지우지 못했어요'))},
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
   'lad-add':()=>{const L=ladInit();const el=$('ladNew');const nm=(el&&el.value||'').trim().slice(0,10);if(!nm){if(el)el.focus();return}
     if(L.names.includes(nm)){toast('이미 참가 중이에요');return}if(L.names.length>=LAD_MAX){toast('최대 '+LAD_MAX+'명까지 참가할 수 있어요');return}
@@ -2275,6 +2475,7 @@ async function boot(){
   db.collection('requests').onSnapshot(snap=>{S.requests=docs(snap);render()},onErr);
   db.collection('customers').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.customers=m;render()},onErr);
   db.doc('settings/org').onSnapshot(snap=>{S.settings=(snap&&snap.data&&snap.data())||{};render()},onErr);
+  db.doc('settings/equip').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||null;equipMetaIn(d)},()=>{});
   db.doc('settings/coffee').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||{};S.coffee=Array.isArray(d.log)?d.log:[];render()},()=>{});
 }
 boot();
