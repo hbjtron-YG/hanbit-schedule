@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.6.2">
+<meta name="app-version" content="1.7.0">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -422,6 +422,26 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-log .txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
 .cf-log .txt b{font-size:15px}
 .cf-log .cf-ppl{overflow-wrap:anywhere}
+.cf-open{all:unset;cursor:pointer;display:flex;gap:10px;align-items:flex-start;flex:1;min-width:0;border-radius:10px}
+.cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
+.cf-more{color:var(--accent,#2563EB);font-weight:600}
+.cfd{display:flex;flex-direction:column;gap:14px}
+.cfd-sum{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:#FFF4E5;color:#5A3000}
+.cfd-sum .cf-cup{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#F39A2B;color:#fff}
+:root[data-theme="dark"] .cfd-sum{background:#3A2A12;color:#FFD9A8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cfd-sum{background:#3A2A12;color:#FFD9A8}}
+.cfd h3{margin:0;font-size:15px}
+.cfd-steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.cfd-steps li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-radius:10px;background:var(--sunken);font-size:14px}
+.cfd-steps li.lose{background:#FDECEC;color:#8A1C1C;font-weight:700}
+:root[data-theme="dark"] .cfd-steps li.lose{background:#3B1B1B;color:#FFB4B4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cfd-steps li.lose{background:#3B1B1B;color:#FFB4B4}}
+.cfd-steps .no{flex:none;min-width:26px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cfd-steps .arrow{color:var(--muted)}
+.cfd-lad{width:100%;height:auto;display:block;background:var(--sunken);border-radius:12px;margin-bottom:10px}
+.cfd-lad .lv{stroke:var(--line);stroke-width:2}
+.cfd-lad text{font-size:11px;fill:var(--fg-2);text-anchor:middle;font-family:inherit}
+.cfd-lad text.win{fill:#C2410C;font-weight:700}
 .cf-game{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface);text-align:left;width:100%;color:var(--fg);min-height:68px}
 .cf-game:hover{border-color:var(--fg-2)}
 .cf-game .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -1121,7 +1141,7 @@ function vLadder(){
   const results=(G.all?[...Array(n).keys()]:G.shown).filter(i=>L.anim!==i).map(i=>({i,win:G.prize[endOf[i]]}));
   const winners=results.filter(x=>x.win).map(x=>G.names[x.i]);
   const allWin=winners.length===G.k;
-  if(allWin&&!G.logged){G.logged=true;setTimeout(()=>coffeeLog('ladder',G.names,G.k,winners),0)}
+  if(allWin&&!G.logged){G.logged=true;setTimeout(()=>coffeeLog('ladder',G.names,G.k,winners,{rung:G.rung.map(row=>row.map(b=>b?'1':'0').join('')),prize:G.prize.map(b=>b?1:0)}),0)}
   const grid=`style="grid-template-columns:repeat(${n},${cw}px);width:${W}px"`;
   return head+`<div class="lad-play">
     <section class="card">
@@ -1155,19 +1175,61 @@ function coffeePlayers(){const L=ladInit();return [...Array(L.n).keys()].map(i=>
 /* 커피내기 결과 공유: settings/coffee {log:[최근 30개]}, 모두에게 보임 */
 const CF_MAX=30;
 function cfGameName(id){const g=GAMES.find(x=>x.id===id);return g?g.name:'커피내기'}
-function coffeeLog(game,names,k,losers){
-  const rec={at:Date.now(),game,names:names.slice(0,LAD_MAX),k,losers:losers.slice(),by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};
+function coffeeLog(game,names,k,losers,d){
+  const rec={at:Date.now(),game,names:names.slice(0,LAD_MAX),k,losers:losers.slice(),by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};if(d)rec.d=d;
   const log=[rec,...(S.coffee||[])].slice(0,CF_MAX);S.coffee=log;
   if(db&&!S.readOnly)db.doc('settings/coffee').set({log}).catch(()=>toast('결과를 공유하지 못했어요'));
 }
 function cfToday(){const t=todayStr();return (S.coffee||[]).filter(r=>ymd(new Date(r.at))===t)}
+function cfWhen(r){const d=new Date(r.at),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');return (ymd(d)===todayStr()?'오늘':`${d.getMonth()+1}.${d.getDate()} (${WD[d.getDay()]})`)+' '+hm}
+function cfChip(nm){const c=pColor(nm,0);return `<span class="pchip" style="--pc:${c[0]};--pt:${c[1]}">${esc(nm)}</span>`}
+function cfDetail(r){
+  const d=r.d,names=r.names||[],lose=new Set(r.losers||[]);
+  const li=(no,body,isLose)=>`<li${isLose?' class="lose"':''}><span class="no">${no}</span>${body}</li>`;
+  let how='',rule='';
+  if(!d){how='<div class="empty">이 결과는 진행 기록을 남기기 전에 한 게임이라 진행 내용이 없어요.</div>'}
+  else if(r.game==='ladder'&&d.rung){
+    rule='각자 위의 이름에서 내려가다 가로줄을 만나면 옆으로 건너가요. 아래 「커피」 칸에 도착한 사람이 걸려요.';
+    const G={rung:d.rung.map(x=>[...x].map(c=>c==='1')),names};const n=names.length;
+    const cw=56,top=26,rowH=20,R=d.rung.length,H=top+rowH*(R+1)+24,W=n*cw;
+    const X=c=>c*cw+cw/2,Y=q=>q<0?top:q>=R?top+rowH*(R+1):top+rowH*(q+1);
+    let svg=`<svg class="cfd-lad" viewBox="0 0 ${W} ${H}" role="img" aria-label="그때 사다리">`;
+    for(let c=0;c<n;c++)svg+=`<line x1="${X(c)}" y1="${top}" x2="${X(c)}" y2="${Y(R)}" class="lv"/>`;
+    for(let q=0;q<R;q++)for(let g=0;g<n-1;g++)if(G.rung[q][g])svg+=`<line x1="${X(g)}" y1="${Y(q)}" x2="${X(g+1)}" y2="${Y(q)}" class="lv"/>`;
+    const ends=[];
+    const ord=names.map((nm,i)=>i).sort((a,b)=>(lose.has(names[a])?1:0)-(lose.has(names[b])?1:0));
+    ord.forEach(i=>{const nm=names[i];const tr=ladTrace(G,i);ends[i]=tr.end;const L=lose.has(nm);const c=pColor(nm,i);
+      svg+=`<path d="${tr.pts.map((p2,j)=>(j?'L':'M')+X(p2[0])+' '+Y(p2[1])).join(' ')}" fill="none" stroke="${c[0]}" stroke-width="${L?4:2}" stroke-linejoin="round" opacity="${L?1:.35}"/>`});
+    names.forEach((nm,i)=>{svg+=`<text x="${X(i)}" y="16"${lose.has(nm)?' class="win"':''}>${esc(nm.length>4?nm.slice(0,4):nm)}</text>`});
+    for(let c=0;c<n;c++)svg+=`<text x="${X(c)}" y="${H-8}"${d.prize[c]?' class="win"':''}>${d.prize[c]?'커피':'통과'}</text>`;
+    svg+='</svg>';
+    how=svg+`<ol class="cfd-steps">${names.map((nm,i)=>li(`${i+1}.`,`${cfChip(nm)}<span class="arrow">→</span> 아래 ${ends[i]+1}번 칸 · ${d.prize[ends[i]]?'커피':'통과'}`,lose.has(nm))).join('')}</ol>`;
+  }else if(r.game==='roulette'&&d.spins){
+    rule='돌림판을 돌려 멈춘 칸의 사람이 걸려요. 여러 명이면 뽑힌 사람을 빼고 다시 돌려요.';
+    how=`<ol class="cfd-steps">${d.spins.map((x,j)=>li(`${j+1}회`,`${x.pool.length}명이 있는 돌림판 <span class="arrow">→</span> ${cfChip(x.pick)} 당첨`,true)).join('')}</ol>
+      <p class="small muted" style="margin:0">돌림판에 있던 사람: ${d.spins[0].pool.map(esc).join(', ')}</p>`;
+  }else if((r.game==='snail'||r.game==='marble')&&d.rank){
+    rule=r.game==='snail'?'달팽이가 결승선에 들어온 순서예요. 끝까지 못 들어온 달팽이가 커피를 사요.':'구슬이 바닥에 떨어진 순서예요. 마지막까지 못 내려온 구슬이 커피를 사요.';
+    how=`<ol class="cfd-steps">${d.rank.map((nm,j)=>li(`${j+1}등`,cfChip(nm)+(d.forced&&d.forced.includes(nm)?' <span class="small muted">(시간 끝, 위치 순)</span>':''),false)).join('')}
+      ${(r.losers||[]).map(nm=>li('꼴찌',`${cfChip(nm)} <span class="arrow">→</span> ${r.game==='snail'?'못 들어옴':'못 내려옴'} · 커피`,true)).join('')}</ol>
+      ${d.timeout?'<p class="small muted" style="margin:0">75초가 지나 남은 구슬은 위치로 순위를 정했어요.</p>':''}`;
+  }else if(r.game==='draw'&&d.picks){
+    rule='참가자가 순서대로 카드를 한 장씩 뒤집어요. 「커피」 카드를 뒤집은 사람이 걸려요.';
+    how=`<ol class="cfd-steps">${d.picks.map((x,j)=>li(`${j+1}.`,`${cfChip(x.nm)}<span class="arrow">→</span> ${x.card}번 카드 · ${x.win?'커피':'통과'}`,x.win)).join('')}</ol>
+      ${d.picks.length<names.length?`<p class="small muted" style="margin:0">커피 카드 ${r.k}장이 모두 나와서 그 뒤 차례는 뽑지 않았어요.</p>`:''}`;
+  }else how='<div class="empty">진행 내용을 읽지 못했어요.</div>';
+  return `<div class="sb cfd">
+    <div class="cfd-sum"><span class="cf-cup">${ic('cup',22)}</span><div><b>${(r.losers||[]).map(esc).join(', ')} 님이 커피를 사요</b><div class="small">${cfWhen(r)} · ${esc(cfGameName(r.game))} · ${names.length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</div></div></div>
+    <section><h3>어떻게 걸렸나</h3>${rule?`<p class="small muted" style="margin:4px 0 10px">${rule}</p>`:''}${how}</section>
+    <p class="small muted" style="margin:0">참가: ${names.map(esc).join(', ')}</p>
+  </div>`;
+}
 function cfRow(r){
-  const d=new Date(r.at),t=todayStr(),k=ymd(d);
-  const hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
-  const when=(k===t?'오늘':`${d.getMonth()+1}.${d.getDate()} (${WD[d.getDay()]})`)+' '+hm;
-  return `<div class="cf-log${k===t?' today':''}"><span class="cf-cup">${ic('cup',18)}</span><div class="txt"><b>${(r.losers||[]).map(esc).join(', ')} 님 커피</b>
-    <span class="small muted">${when} · ${esc(cfGameName(r.game))} · ${(r.names||[]).length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</span>
-    <span class="small muted cf-ppl">참가: ${(r.names||[]).map(esc).join(', ')}</span></div>
+  const t=todayStr(),k=ymd(new Date(r.at));
+  return `<div class="cf-log${k===t?' today':''}"><button type="button" class="cf-open" data-act="cf-open" data-at="${r.at}" aria-label="${(r.losers||[]).map(esc).join(', ')} 님 커피, 진행 기록 보기"><span class="cf-cup">${ic('cup',18)}</span><span class="txt"><b>${(r.losers||[]).map(esc).join(', ')} 님 커피</b>
+    <span class="small muted">${cfWhen(r)} · ${esc(cfGameName(r.game))} · ${(r.names||[]).length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</span>
+    <span class="small muted cf-ppl">참가: ${(r.names||[]).map(esc).join(', ')}</span>
+    <span class="small cf-more">${r.d?'어떻게 걸렸는지 보기 ›':'진행 기록 없음'}</span></span></button>
     ${S.readOnly?'':(()=>{const ask=S.cfAsk===String(r.at);return `<button type="button" class="btn sm${ask?' danger':''}" data-act="cf-del" data-at="${r.at}" aria-label="${ask?'한 번 더 누르면 삭제':'이 결과 삭제'}">${ask?'정말 삭제':'삭제'}</button>`})()}</div>`;
 }
 function cfSection(list,title,empty,extra){
@@ -1212,11 +1274,11 @@ function vPlay(){
   </div>`;
 }
 function stopGame(){if(S.gameStop){try{S.gameStop()}catch(e){}S.gameStop=null}}
-function gameDone(losers){
+function gameDone(losers,d){
   const box=$('gResult');if(!box)return;
   box.innerHTML=`<section class="card lad-result" role="status"><span class="lad-cup">${ic('cup',28)}</span><div><b>${losers.map(esc).join(', ')}</b><span>님이 커피를 사요!</span></div></section>
     <div class="gbtns"><button type="button" class="btn primary" data-act="g-again">${ic('ladder',18)}한 번 더</button><button type="button" class="btn" data-act="go" data-v="coffee">다른 게임</button></div>`;
-  coffeeLog(S.game,coffeePlayers().map(p=>p.nm),ladInit().k,losers);
+  coffeeLog(S.game,coffeePlayers().map(p=>p.nm),ladInit().k,losers,d);
   try{navigator.vibrate&&navigator.vibrate(150)}catch(e){}
   setTimeout(()=>{try{box.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}},50);
 }
@@ -1236,7 +1298,7 @@ function mountRoulette(st,ctl,ps,k){
   const size=Math.max(240,Math.min(st.clientWidth,400));
   st.innerHTML=`<canvas id="rwCanvas" aria-label="돌림판"></canvas>`;
   const cv=$('rwCanvas'),cx=setupCanvas(cv,size,size+18);
-  let rem=ps.slice(),wins=[],ang=0,spinning=false,raf=0,alive=true,last=null;
+  let rem=ps.slice(),wins=[],ang=0,spinning=false,raf=0,alive=true,last=null;const spins=[];
   const P0=-Math.PI/2;
   function draw(){
     cx.clearRect(0,0,size,size+18);
@@ -1262,8 +1324,8 @@ function mountRoulette(st,ctl,ps,k){
     const a0=ang,dur=reduceMotion()?600:4600,t0=performance.now();
     const step=now=>{if(!alive)return;const x=Math.min(1,(now-t0)/dur);const e=1-Math.pow(1-x,4);ang=a0+delta*e;draw();
       if(x<1){raf=requestAnimationFrame(step);return}
-      spinning=false;const w=rem[t];wins.push(w.nm);last=t;
-      if(wins.length>=k){status(`<b>${esc(w.nm)}</b> 당첨!`);$('rwSpin').hidden=true;gameDone(wins)}
+      spinning=false;const w=rem[t];spins.push({pool:rem.map(x=>x.nm),pick:w.nm});wins.push(w.nm);last=t;
+      if(wins.length>=k){status(`<b>${esc(w.nm)}</b> 당첨!`);$('rwSpin').hidden=true;gameDone(wins,{spins})}
       else status(`<b>${esc(w.nm)}</b> 당첨! ${wins.length}/${k}명`);
     };
     raf=requestAnimationFrame(step);
@@ -1294,7 +1356,7 @@ function mountSnail(st,ctl,ps,k){
       if(fin.length>=n-k){
         const losers=[...Array(n).keys()].filter(j=>!fin.includes(j));
         losers.forEach(j=>{const r=$('rk-'+ps[j].i);if(r){r.innerHTML=ic('cup',16);r.className='lrank lose'}});
-        status('경주 끝!');gameDone(losers.map(j=>ps[j].nm));return;
+        status('경주 끝!');gameDone(losers.map(j=>ps[j].nm),{rank:fin.map(j=>ps[j].nm)});return;
       }
       raf=requestAnimationFrame(step)};
     raf=requestAnimationFrame(step);
@@ -1377,8 +1439,9 @@ function mountMarble(st,ctl,ps,k){
     if(running){const sub=6;for(let i=0;i<sub;i++)physics(dt/sub);side();
       if(fin.length>=ps.length-k||t>75){running=false;ended=true;
         const left=balls.filter(b=>!b.done).sort((a,b)=>a.y-b.y).slice(0,k);
-        balls.filter(b=>!b.done&&!left.includes(b)).forEach(b=>{b.done=true;fin.push(b)});
-        ctl.innerHTML=`<p class="gmsg">끝까지 못 내려온 ${k}명이 커피!</p>`;gameDone(left.map(b=>b.p.nm));side()}}
+        const forced=balls.filter(b=>!b.done&&!left.includes(b)).sort((a,b)=>b.y-a.y);const timeout=forced.length>0;
+        forced.forEach(b=>{b.done=true;fin.push(b)});
+        ctl.innerHTML=`<p class="gmsg">끝까지 못 내려온 ${k}명이 커피!</p>`;gameDone(left.map(b=>b.p.nm),{rank:fin.map(b=>b.p.nm),forced:forced.map(b=>b.p.nm),timeout});side()}}
     else if(ended)t+=dt;
     drawBalls();raf=requestAnimationFrame(loop)}
   ctl.innerHTML=`<p class="gmsg">마지막으로 떨어지는 ${k}명이 커피를 사요.</p><button type="button" class="btn primary gbig" id="mbGo">떨어뜨리기</button>`;
@@ -1392,17 +1455,17 @@ function mountDraw(st,ctl,ps,k){
   const n=ps.length,deck=Array(n).fill(false);
   const slots=[...Array(n).keys()];for(let i=n-1;i>0;i--){const j=rnd(i+1);[slots[i],slots[j]]=[slots[j],slots[i]]}
   slots.slice(0,k).forEach(i=>deck[i]=true);
-  let turn=0;const picked={},wins=[];let over=false;
+  let turn=0;const picked={},wins=[],picks=[];let over=false;
   st.innerHTML=`<div class="cards" style="grid-template-columns:repeat(${n<=4?n:n<=9?3:4},minmax(0,1fr))">${deck.map((_,i)=>`<button type="button" class="dcard" id="dc-${i}" aria-label="${i+1}번 카드"><span class="back">${i+1}</span><span class="front"></span></button>`).join('')}</div>`;
   function status(){if(over)return;const p=ps[turn];const c=pColor(p.nm,p.i);ctl.innerHTML=`<p class="gmsg"><span class="pchip" style="--pc:${c[0]};--pt:${c[1]}">${esc(p.nm)}</span> 님 차례예요. 카드를 한 장 골라요.</p>`}
   deck.forEach((win,i)=>{$('dc-'+i).onclick=()=>{
     if(over||picked[i]!=null)return;const p=ps[turn];picked[i]=p;const el=$('dc-'+i);
     el.querySelector('.front').innerHTML=`<b>${esc(p.nm)}</b>${win?`<span class="win">${ic('cup',18)}커피</span>`:'<span>통과</span>'}`;
-    el.classList.add('open');if(win){el.classList.add('hit');wins.push(p.nm)}
+    el.classList.add('open');if(win){el.classList.add('hit');wins.push(p.nm)}picks.push({nm:p.nm,card:i+1,win:!!win});
     turn++;
     if(wins.length>=k||turn>=n){over=true;ctl.innerHTML=`<p class="gmsg">커피 카드가 모두 나왔어요.</p>`;
       deck.forEach((w,j)=>{if(picked[j]==null){const e=$('dc-'+j);e.classList.add('open','rest');e.querySelector('.front').innerHTML=w?`<span class="win">${ic('cup',18)}커피</span>`:'<span>통과</span>'}});
-      gameDone(wins)}
+      gameDone(wins,{picks})}
     else status();
   }});
   status();
@@ -1924,6 +1987,7 @@ const A={
   'lad-run':t=>{const L=S.lad,G=L&&L.game;if(!G)return;const i=Number(t.dataset.i);if(!G.all&&!G.shown.includes(i))G.shown.push(i);L.anim=i;render();
     const ms=matchMedia('(prefers-reduced-motion:reduce)').matches?0:1500;clearTimeout(L.timer);L.timer=setTimeout(()=>{if(S.lad.anim===i){S.lad.anim=null;if(S.view==='ladder')render()}},ms)},
   'lad-all':()=>{const L=S.lad;if(!L||!L.game)return;L.game.all=true;L.anim=null;render()},
+  'cf-open':t=>{const r=(S.coffee||[]).find(x=>String(x.at)===t.dataset.at);if(!r)return;openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r))},
   'cf-del':t=>{const k=t.dataset.at;clearTimeout(S.cfAskT);
     if(S.cfAsk!==k){S.cfAsk=k;render();S.cfAskT=setTimeout(()=>{S.cfAsk=null;render()},4000);return}
     S.cfAsk=null;const log=k==='all'?[]:(S.coffee||[]).filter(r=>String(r.at)!==k);S.coffee=log;render();toast(k==='all'?'결과를 모두 지웠어요':'결과를 지웠어요');
