@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.6.1">
+<meta name="app-version" content="1.6.2">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -1168,7 +1168,7 @@ function cfRow(r){
   return `<div class="cf-log${k===t?' today':''}"><span class="cf-cup">${ic('cup',18)}</span><div class="txt"><b>${(r.losers||[]).map(esc).join(', ')} 님 커피</b>
     <span class="small muted">${when} · ${esc(cfGameName(r.game))} · ${(r.names||[]).length}명 중 ${r.k}명${r.by?` · ${esc(r.by)} 진행`:''}</span>
     <span class="small muted cf-ppl">참가: ${(r.names||[]).map(esc).join(', ')}</span></div>
-    ${S.admin&&!S.readOnly?`<button type="button" class="btn sm danger" data-act="cf-del" data-at="${r.at}">삭제</button>`:''}</div>`;
+    ${S.readOnly?'':(()=>{const ask=S.cfAsk===String(r.at);return `<button type="button" class="btn sm${ask?' danger':''}" data-act="cf-del" data-at="${r.at}" aria-label="${ask?'한 번 더 누르면 삭제':'이 결과 삭제'}">${ask?'정말 삭제':'삭제'}</button>`})()}</div>`;
 }
 function cfSection(list,title,empty,extra){
   return `<section class="card" aria-label="${title}"><div class="card-h"><h2>${title}</h2>${extra||''}</div>
@@ -1197,7 +1197,8 @@ function vCoffee(){
       <div class="sec-h"><h2 id="gmH">게임 고르기</h2></div>
       <div class="cf-games">${GAMES.map(g=>`<button type="button" class="cf-game g-${g.id}" data-act="play" data-g="${g.id}" ${ok?'':'disabled'}>
         <span class="cf-ic">${ic(g.ic,26)}</span><span class="txt"><b>${g.name}</b><span class="small muted">${g.desc}</span></span>${ic('next',18)}</button>`).join('')}</div>
-      ${cfSection((S.coffee||[]).slice(0,10),'최근 결과','아직 결과가 없어요. 게임이 끝나면 결과가 여기에 올라와 모두가 볼 수 있어요.','<span class="small muted">모두에게 보여요</span>')}
+      ${cfSection((S.coffee||[]).slice(0,10),'최근 결과','아직 결과가 없어요. 게임이 끝나면 결과가 여기에 올라와 모두가 볼 수 있어요.',(S.coffee||[]).length&&!S.readOnly?`<button type="button" class="btn sm${S.cfAsk==='all'?' danger':' ghost'}" data-act="cf-del" data-at="all">${S.cfAsk==='all'?'정말 모두 삭제':'모두 지우기'}</button>`:'<span class="small muted">모두에게 보여요</span>')}
+      ${(S.coffee||[]).length?'<p class="small muted" style="margin:0">결과는 모두에게 보여요. 삭제는 한 번 더 눌러야 지워지고, 지우면 모두의 화면에서 사라져요.</p>':''}
     </section>
   </div>`;
 }
@@ -1923,7 +1924,10 @@ const A={
   'lad-run':t=>{const L=S.lad,G=L&&L.game;if(!G)return;const i=Number(t.dataset.i);if(!G.all&&!G.shown.includes(i))G.shown.push(i);L.anim=i;render();
     const ms=matchMedia('(prefers-reduced-motion:reduce)').matches?0:1500;clearTimeout(L.timer);L.timer=setTimeout(()=>{if(S.lad.anim===i){S.lad.anim=null;if(S.view==='ladder')render()}},ms)},
   'lad-all':()=>{const L=S.lad;if(!L||!L.game)return;L.game.all=true;L.anim=null;render()},
-  'cf-del':t=>{const at=Number(t.dataset.at);const log=(S.coffee||[]).filter(r=>r.at!==at);S.coffee=log;render();if(db)db.doc('settings/coffee').set({log}).catch(()=>toast('지우지 못했어요'))},
+  'cf-del':t=>{const k=t.dataset.at;clearTimeout(S.cfAskT);
+    if(S.cfAsk!==k){S.cfAsk=k;render();S.cfAskT=setTimeout(()=>{S.cfAsk=null;render()},4000);return}
+    S.cfAsk=null;const log=k==='all'?[]:(S.coffee||[]).filter(r=>String(r.at)!==k);S.coffee=log;render();toast(k==='all'?'결과를 모두 지웠어요':'결과를 지웠어요');
+    if(db)db.doc('settings/coffee').set({log}).catch(()=>toast('지우지 못했어요'))},
   'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);store.set('hj.meSet','1');toast(S.me?'저장했어요':'이름을 지웠어요');render()},
   'weather':()=>openWeather()
 };
