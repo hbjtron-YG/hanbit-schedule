@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.8.1">
+<meta name="app-version" content="1.9.0">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -427,6 +427,7 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
 .cf-more{color:var(--accent,#2563EB);font-weight:600}
 .cfd{display:flex;flex-direction:column;gap:14px}
+@media (max-width:420px){.xl-b .xl-t{display:none}.xl-b{padding-left:10px;padding-right:10px}}
 .rp-badge{flex:none;align-self:center;padding:4px 10px;border-radius:999px;background:#F39A2B;color:#fff;font-size:13px;font-weight:700}
 .cfd-sum{display:flex;gap:12px;align-items:center;padding:12px;border-radius:12px;background:#FFF4E5;color:#5A3000}
 .cfd-sum .cf-cup{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#F39A2B;color:#fff}
@@ -874,6 +875,7 @@ function vCal(){
     <div class="mnav"><button type="button" class="ib flat" data-act="month" data-n="-1" aria-label="이전 달">${ic('back')}</button><h1>${S.y}년 ${S.m+1}월</h1><button type="button" class="ib flat" data-act="month" data-n="1" aria-label="다음 달">${ic('next')}</button></div>
     <span style="margin-right:auto"></span>
     <button type="button" class="btn sm" data-act="report">${ic('mail',16)}미팅 안건</button>
+    <button type="button" class="btn sm xl-b" data-act="xlsx" aria-label="일정 엑셀로 받기" title="일정 엑셀로 받기">${ic('down',16)}<span class="xl-t">엑셀</span></button>
     <button type="button" class="btn sm" data-act="cal-today">오늘</button>
     <button type="button" class="ib" data-act="go" data-v="list" aria-label="목록으로 보기">${ic('list')}</button>
   </div>
@@ -1680,6 +1682,96 @@ function rptBuild(mon,ppl){
   }).join('\n');
   return {title,body:body.replace(/\n+$/,'\n')};
 }
+/* ---------- 일정 엑셀로 받기 (.xlsx를 이 기기에서 직접 만듦, 외부 전송 없음) ---------- */
+function xEsc(v){return String(v==null?'':v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function xCol(i){let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s}
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+function zipStore(files){/* 압축 없이 묶는 zip (xlsx 용) */
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  const d=new Date(),dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF,dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+  files.forEach(([name,txt])=>{
+    const nb=enc.encode(name),data=enc.encode(txt),crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,dt,true);h.setUint16(12,dd,true);
+    h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+    parts.push(new Uint8Array(h.buffer),nb,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,dt,true);c.setUint16(14,dd,true);
+    c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+data.length;
+  });
+  const csz=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csz,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function xlsxBlob(sheetName,head,rows,widths){
+  const cell=(v,r,c,st)=>{const ref=xCol(c)+r;if(typeof v==='number')return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`};
+  const all=[head,...rows],last=xCol(head.length-1)+all.length;
+  const sd=all.map((row,ri)=>`<row r="${ri+1}">${row.map((v,ci)=>cell(v,ri+1,ci,ri?2:1)).join('')}</row>`).join('');
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:${last}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="16.5"/><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData>${rows.length?`<autoFilter ref="A1:${last}"/>`:''}</worksheet>`;
+  const sn=xEsc(sheetName);
+  return zipStore([
+    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sn}" sheetId="1" r:id="rId1"/></sheets>${rows.length?`<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${sn}'!$A$1:$${xCol(head.length-1)}$${all.length}</definedName></definedNames>`:''}</workbook>`],
+    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/><family val="3"/><charset val="129"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EAF5"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC9D1DC"/></left><right style="thin"><color rgb="FFC9D1DC"/></right><top style="thin"><color rgb="FFC9D1DC"/></top><bottom style="thin"><color rgb="FFC9D1DC"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
+    ['xl/worksheets/sheet1.xml',sheet]
+  ]);
+}
+const XL_HEAD=['시작일','요일','종료일','일수(평일)','담당자','구분','고객사','사이트','고객 담당자','작업내용','메모'];
+const XL_W=[12,6,12,10,9,12,16,16,14,40,30];
+function xlRows(from,to,ppl){
+  const custTxt=p=>p.customer==='기타'?(p.customerName||'기타'):(p.customer||'');
+  const out=[];
+  S.events.forEach(e=>{
+    const st=e.start,en=e.end||e.start;if(!st||en<from||st>to)return;
+    const ps=placesOf(e),tb=isTbd(e);
+    let wd=0;{const d=new Date(st+'T00:00:00'),E=new Date(en+'T00:00:00');for(let i=0;d<=E&&i<800;i++){const w=d.getDay();if(w>0&&w<6)wd++;d.setDate(d.getDate()+1)}}
+    splitP(e.person).forEach(p=>{if(ppl.length&&!ppl.includes(p))return;
+      out.push({k:st,r:rankOf(p),row:[st,WD[new Date(st+'T00:00:00').getDay()],en,tb?'':wd,p,
+        isLeave(e)?leaveOf(e):(tb?'업무(날짜 미정)':'업무'),
+        isLeave(e)?'':ps.map(custTxt).join(' / '),isLeave(e)?'':ps.map(x=>x.site||'').join(' / '),
+        e.contact||'',e.work||((e.equipment||[]).join(', '))||'',e.memo||'']})});
+  });
+  return out.sort((a,b)=>a.k.localeCompare(b.k)||(a.r-b.r)).map(x=>x.row);
+}
+function openXlsx(){
+  const mStart=(y,m)=>ymd(new Date(y,m,1)),mEnd=(y,m)=>ymd(new Date(y,m+1,0));
+  const t=new Date();
+  const st={mode:'month',from:mStart(S.y,S.m),to:mEnd(S.y,S.m),ppl:[]};
+  const modes=[['month',`${S.m+1}월`],['year',`${t.getFullYear()}년`],['all','전체'],['custom','직접']];
+  openSheet(`<div class="sb">
+    <div class="f"><span class="lab">기간</span><div class="seg" role="group" aria-label="기간" id="xlMode">${modes.map(([k,l])=>`<button type="button" data-m="${k}" aria-pressed="${k==='month'}">${l}</button>`).join('')}</div></div>
+    <div class="rowline" id="xlCustom" hidden><div class="f" style="flex:1"><label for="xlFrom">시작</label><input type="date" id="xlFrom"></div><div class="f" style="flex:1"><label for="xlTo">끝</label><input type="date" id="xlTo"></div></div>
+    <div class="f"><span class="lab">사람 (아무도 안 고르면 전체)</span><div class="picks" id="xlPpl"></div></div>
+    <p class="small muted" id="xlInfo" style="margin:0"></p>
+    <button type="button" class="btn primary" id="xlGo">${ic('down',18)}엑셀 파일 받기 (.xlsx)</button>
+    <p class="small muted" style="margin:0">파일은 이 기기에서 바로 만들어지고 다른 곳으로 보내지지 않아요. 한 사람이 여러 명과 같이 간 일정은 사람마다 한 줄씩 나와요.</p>
+  </div>`,'일정 엑셀로 받기','누가 · 언제 · 어디서 · 무슨 작업');
+  const all=()=>{const ds=S.events.map(e=>e.start).filter(Boolean).sort();const de=S.events.map(e=>e.end||e.start).filter(Boolean).sort();return [ds[0]||ymd(t),de[de.length-1]||ymd(t)]};
+  const draw=()=>{
+    if(st.mode==='month'){st.from=mStart(S.y,S.m);st.to=mEnd(S.y,S.m)}
+    else if(st.mode==='year'){st.from=`${t.getFullYear()}-01-01`;st.to=`${t.getFullYear()}-12-31`}
+    else if(st.mode==='all'){[st.from,st.to]=all()}
+    else{st.from=$('xlFrom').value||st.from;st.to=$('xlTo').value||st.to}
+    $('xlCustom').hidden=st.mode!=='custom';$('xlFrom').value=st.from;$('xlTo').value=st.to;
+    $('xlMode').querySelectorAll('[data-m]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===st.mode));
+    $('xlPpl').innerHTML=people().map(n=>{const c=colorOf(n);return `<button type="button" class="pick pp" style="--pc:${c[0]};--pt:${c[1]}" data-p="${esc(n)}" aria-pressed="${st.ppl.includes(n)}">${esc(n)}</button>`}).join('');
+    $('xlPpl').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{const n=b.dataset.p;st.ppl=st.ppl.includes(n)?st.ppl.filter(x=>x!==n):[...st.ppl,n];draw()});
+    const bad=st.from>st.to,n=bad?0:xlRows(st.from,st.to,st.ppl).length;
+    $('xlInfo').textContent=bad?'시작이 끝보다 늦어요.':`${st.from.replace(/-/g,'.')} ~ ${st.to.replace(/-/g,'.')} · ${st.ppl.length?st.ppl.join(', '):'전체'} · ${n}줄`;
+    $('xlGo').disabled=bad||!n;
+  };
+  $('xlMode').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{st.mode=b.dataset.m;draw()});
+  $('xlFrom').onchange=$('xlTo').onchange=()=>{st.mode='custom';draw()};
+  $('xlGo').onclick=()=>{
+    const rows=xlRows(st.from,st.to,st.ppl);if(!rows.length)return;
+    const blob=xlsxBlob('일정',XL_HEAD,rows,XL_W);
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`hanbit_schedule_${st.from.replace(/-/g,'')}-${st.to.replace(/-/g,'')}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast(`엑셀 파일을 받았어요 (${rows.length}줄)`);
+  };
+  draw();
+}
 function openReport(){
   const st={mon:weekMon(new Date()),ppl:rptPeopleDefault()};
   openSheet(`<div class="sb">
@@ -2045,6 +2137,7 @@ const A={
     else{if(L.names.length>=LAD_MAX){toast('최대 '+LAD_MAX+'명까지 참가할 수 있어요');return}L.names.push(nm)}
     ladSort();ladSave();render()},
   'report':()=>openReport(),
+  'xlsx':()=>openXlsx(),
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
   'lad-add':()=>{const L=ladInit();const el=$('ladNew');const nm=(el&&el.value||'').trim().slice(0,10);if(!nm){if(el)el.focus();return}
     if(L.names.includes(nm)){toast('이미 참가 중이에요');return}if(L.names.length>=LAD_MAX){toast('최대 '+LAD_MAX+'명까지 참가할 수 있어요');return}
