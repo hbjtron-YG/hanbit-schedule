@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.10.1">
+<meta name="app-version" content="1.10.2">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -1761,15 +1761,22 @@ const EQ_CHUNK=2000;
 function docOnce(path){
   return new Promise(res=>{if(!db){res(null);return}let un=null,done=false;const fin=v=>{if(done)return;done=true;try{un&&un()}catch(e){}res(v)};
     try{un=db.doc(path).onSnapshot(sn=>{const d=sn&&sn.data&&sn.data();if(d||!(sn&&sn.metadata&&sn.metadata.fromCache))fin(d||null)},()=>fin(null))}catch(e){fin(null)}
-    setTimeout(()=>fin(null),10000)});
+    setTimeout(()=>fin(null),25000)});
 }
-async function equipMetaIn(d){
+async function equipMetaIn(d,force){
   S.equipMeta=d&&d.count?d:null;
-  if(!S.equipMeta){if(S.equip.length){S.equip=[];render()}return}
-  if(S.equipAt===d.at)return;S.equipAt=d.at;
-  const parts=await Promise.all([...Array(d.chunks||0).keys()].map(i=>docOnce('settings/equip-'+i)));
+  if(!S.equipMeta){S.eqLoad='';if(S.equip.length){S.equip=[];S.equipAt=null;render()}return}
+  if(!force&&S.equipAt===d.at&&(S.eqLoad==='ok'||S.eqLoad==='loading'))return;
+  S.equipAt=d.at;S.eqLoad='loading';render();
+  let rows=null;
+  for(let t=0;t<3&&rows==null;t++){
+    const parts=await Promise.all([...Array(d.chunks||0).keys()].map(i=>docOnce('settings/equip-'+i)));
+    if(S.equipAt!==d.at)return;
+    if(parts.every(x=>x&&Array.isArray(x.rows)))rows=parts.flatMap(x=>x.rows);
+  }
   if(S.equipAt!==d.at)return;
-  S.equip=parts.flatMap(x=>(x&&Array.isArray(x.rows))?x.rows:[]);render();
+  if(rows){S.equip=rows;S.eqLoad='ok'}else S.eqLoad='fail';
+  render();
 }
 const eqKey=v=>String(v||'').toUpperCase().replace(/[\s\-_]/g,'');
 function eqFind(q,sites){
@@ -1841,7 +1848,7 @@ async function eqSave(rows,file){
   for(let i=chunks;i<old;i++)await db.doc('settings/equip-'+i).delete().catch(()=>{});
   const meta={count:rows.length,chunks,at,file:file||'',by:(store.get('hj.meSet')==='1'&&S.me)?S.me:''};
   await db.doc('settings/equip').set(meta);
-  S.equipAt=at;S.equipMeta=meta;S.equip=rows;render();
+  S.equipAt=at;S.equipMeta=meta;S.equip=rows;S.eqLoad='ok';render();
 }
 async function eqClear(){
   const old=S.equipMeta&&S.equipMeta.chunks||0;
@@ -1871,7 +1878,9 @@ function eqCard(){
   const when=m&&m.at?(()=>{const d=new Date(m.at);return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`})():'';
   const ask=S.eqAsk;
   return `<section class="card" aria-labelledby="eqH"><div class="card-h"><h2 id="eqH">장비 목록</h2></div>
-    <p class="small" style="margin:0;color:var(--fg-2)">${n?`<b>${n}대</b> 등록됨${m&&m.file?` · ${esc(m.file)}`:''}${when?` · ${when}`:''}${m&&m.by?` · ${esc(m.by)}`:''}`:'아직 없어요. 장비 엑셀(.xlsx)을 올리면 일정 입력의 「호기」 칸에서 찾아 고를 수 있어요.'}</p>
+    ${m&&S.eqLoad==='loading'?`<p class="small" style="margin:0;color:var(--fg-2)">장비 목록 ${m.count}대를 불러오는 중이에요…</p>`:''}
+    ${m&&S.eqLoad==='fail'?`<p class="small" style="margin:0;color:#B45309">장비 목록 ${m.count}대가 저장돼 있지만 불러오지 못했어요. 인터넷 연결을 확인하고 다시 불러와 주세요.</p><button type="button" class="btn sm" data-act="eq-reload">다시 불러오기</button>`:''}
+    <p class="small" style="margin:0;color:var(--fg-2)">${n?`<b>${n}대</b> 등록됨${m&&m.file?` · ${esc(m.file)}`:''}${when?` · ${when}`:''}${m&&m.by?` · ${esc(m.by)}`:''}`:(m?'':'아직 없어요. 장비 엑셀(.xlsx)을 올리면 일정 입력의 「호기」 칸에서 찾아 고를 수 있어요.')}</p>
     <p class="small muted" style="margin:0">읽는 열: A 회사명 · B 담당자 · C 장비 위치 · D Product · E S/N · K 호기</p>
     ${S.readOnly?'':`<button type="button" class="btn" data-act="eq-up">${ic('up',18)}${n?'장비 엑셀 다시 올리기':'장비 엑셀 올리기'}</button>`}
     <button type="button" class="btn" data-act="xlsx">${ic('down',18)}장비별 작업 이력 받기</button>
@@ -2337,6 +2346,7 @@ const A={
   'report':()=>openReport(),
   'xlsx':()=>openXlsx(),
   'eq-up':()=>eqUpload(),
+  'eq-reload':()=>{if(S.equipMeta)equipMetaIn(S.equipMeta,true)},
   'eq-clear':()=>{clearTimeout(S.eqAskT);if(!S.eqAsk){S.eqAsk=true;render();S.eqAskT=setTimeout(()=>{S.eqAsk=false;render()},4000);return}S.eqAsk=false;eqClear().then(()=>toast('장비 목록을 지웠어요')).catch(()=>toast('지우지 못했어요'))},
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
   'lad-add':()=>{const L=ladInit();const el=$('ladNew');const nm=(el&&el.value||'').trim().slice(0,10);if(!nm){if(el)el.focus();return}
