@@ -5,7 +5,7 @@ self.addEventListener('push',e=>{
   let p={};try{p=e.data?e.data.json():{}}catch(err){try{p={data:{body:e.data.text()}}}catch(e2){}}
   const d=p.data||p.notification||p||{};
   const title=d.title||'한빛 일정';
-  const opt={body:d.body||'',icon:'icons/icon-192.png',badge:'icons/favicon-48.png',tag:d.tag||'hanbit',renotify:true,data:{url:d.url||'./'},lang:'ko'};
+  const opt={body:d.body||'',icon:'icons/icon-192.png',badge:'icons/badge-96.png',tag:d.tag||'hanbit',renotify:true,data:{url:d.url||'./'},lang:'ko'};
   e.waitUntil(self.registration.showNotification(title,opt));
 });
 self.addEventListener('notificationclick',e=>{
