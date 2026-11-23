@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.16.4">
+<meta name="app-version" content="1.16.5">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -456,6 +456,9 @@ button.ev-row:hover{border-color:var(--line)}
 .au-cp summary{cursor:pointer;font-weight:600;padding:6px 0}.au-cp[open]{display:flex;flex-direction:column;gap:8px}
 .lg-hint{display:flex;flex-direction:column;gap:4px;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A8A;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.5}
 .sa-tg{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%}.sa-tg .txt{display:flex;flex-direction:column;gap:2px;flex:1}.sa-tg b{font-size:17px}.sa-tg:focus-visible{outline:2px solid #2563EB;outline-offset:4px;border-radius:8px}
+/* 안드로이드 크롬 "검색결과를 보려면 탭하세요"(탭하여 검색) 막기: 글자 선택을 끄고 입력칸·안내 문구만 허용 */
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable],.ac-new pre,.selectable{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 .pu-on{font-size:12.5px;font-weight:700;color:#15803D;background:#DCFCE7;border-radius:999px;padding:3px 10px}
 .chk{display:flex;gap:10px;align-items:center;font-size:15px;min-height:40px;cursor:pointer}.chk input{width:20px;height:20px;accent-color:#2563EB}
 #cfBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-140%);transition:transform .25s ease;z-index:200;width:min(560px,calc(100% - 20px));display:flex;align-items:center;gap:6px;padding:10px 8px 10px 12px;border-radius:16px;background:#FFF4E5;border:1px solid #F6C27A;color:#5A3000;box-shadow:0 12px 30px rgba(15,23,42,.22)}
