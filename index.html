@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.17.1">
+<meta name="app-version" content="1.17.2">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -1307,7 +1307,7 @@ function cfOpenPending(){
   setTimeout(()=>{openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r));const b=$('cfReplay');if(b)b.onclick=()=>{closeSheet();startReplay(r)}},50);
 }
 /* ---------- 만든 사람 크레딧 (버전 글자 7번 / 메뉴 › 안내 한 줄) ---------- */
-const MADE_BY='송윤근',MADE_SINCE='2026년 11월',UPDATES=40;
+const MADE_BY='송윤근',MADE_SINCE='2026년 11월',UPDATES=41;
 function showCredits(){
   let el=$('credits');if(el)el.remove();
   el=document.createElement('div');el.id='credits';el.setAttribute('role','dialog');el.setAttribute('aria-label','만든 사람');
@@ -1767,29 +1767,29 @@ function mountMarble(st,ctl,ps,k){
   const pegs=[],segs=[],bumps=[],mills=[],bars=[],portals=[],doors=[],boosts=[];
   segs.push([0,0,0,WH],[WW,0,WW,WH]);
   segs.push([0,110,165,165],[WW,110,235,165]);                                     /* 출발 깔때기 */
-  for(let r=0;r<7;r++){const y=200+r*30,off=r%2?20:0;for(let x=20+off;x<WW;x+=40)pegs.push([x+(rnd(7)-3),y,5])}
+  for(let r=0;r<7;r++){const y=200+r*30,off=r%2?20:0;for(let x=20+off;x<WW;x+=40){const j=rnd(7)-3;if(x>=36&&x<=WW-36)pegs.push([x+j,y,5])}}
   mills.push({x:105,y:520,L:58,w:2.6,n:3},{x:295,y:520,L:58,w:-2.6,n:3},{x:200,y:640,L:70,w:3.4,n:4}); /* 풍차 */
   bumps.push([80,780,22],[320,780,22],[200,850,26],[120,930,16],[280,930,16]);    /* 강한 범퍼 */
   segs.push([0,990,150,1030],[WW,990,250,1030]);
   bars.push({y:1100,L:130,amp:120,w:1.7,ph:0},{y:1190,L:110,amp:130,w:-2.1,ph:1.3},{y:1280,L:130,amp:120,w:2.4,ph:2.1}); /* 움직이는 막대 */
   portals.push({x:70,y:1360,tx:340,ty:430,col:'#A855F7'},{x:330,y:1360,tx:70,ty:1980,col:'#00FFA3'}); /* 순간이동: 보라=뒤로, 초록=앞으로 */
   segs.push([0,1330,40,1400],[WW,1330,360,1400]);
-  for(let r=0;r<3;r++){const y=1420+r*30,off=r%2?22:0;for(let x=40+off;x<WW-20;x+=44)pegs.push([x,y,5])}
+  for(let r=0;r<3;r++){const y=1420+r*30,off=r%2?22:0;for(let x=40+off;x<WW-20;x+=44)if(x>=36&&x<=WW-36)pegs.push([x,y,5])}
   segs.push([0,1520,120,1580],[WW,1520,280,1580]);                                 /* 함정문 앞 깔때기 */
   segs.push([0,1620,120,1620],[280,1620,WW,1620]);
   doors.push({a:[120,1620,200,1620],per:3.2,open:1.1,ph:0},{a:[200,1620,280,1620],per:3.2,open:1.1,ph:1.6}); /* 함정문 */
   boosts.push({x:60,y:1700,w:110,h:60},{x:230,y:1760,w:110,h:60});                 /* 가속 구간 */
-  for(let r=0;r<4;r++){const y=1880+r*32,off=r%2?20:0;for(let x=20+off;x<WW;x+=40)pegs.push([x+(rnd(5)-2),y,5])}
+  for(let r=0;r<4;r++){const y=1880+r*32,off=r%2?20:0;for(let x=20+off;x<WW;x+=40){const j=rnd(5)-2;if(x>=36&&x<=WW-36)pegs.push([x+j,y,5])}}
   mills.push({x:130,y:2150,L:62,w:-3,n:3},{x:270,y:2150,L:62,w:3,n:3});
   bumps.push([200,2260,24],[70,2330,18],[330,2330,18]);
   bars.push({y:2420,L:150,amp:100,w:2.8,ph:.5});
   segs.push([0,2500,250,2560],[WW,2610,150,2670],[0,2720,250,2780]);               /* 마지막 지그재그 */
-  for(let x=30;x<WW-10;x+=44)pegs.push([x,2830,5]);
+  for(let x=40;x<WW-30;x+=44)pegs.push([x,2830,5]);
   mills.forEach(m=>m.a0=rnd(628)/100);
   /* ----- 공 ----- */
   const order=[...ps.keys()];for(let i=order.length-1;i>0;i--){const j=rnd(i+1);[order[i],order[j]]=[order[j],order[i]]}
   const balls=order.map((pi,j)=>{const cols=Math.min(N,8),row=Math.floor(j/cols),col=j%cols;
-    return {p:ps[pi],col:NEON[pi%NEON.length],x:WW/2+(col-(cols-1)/2)*(WW-80)/Math.max(1,cols-1)*(cols>1?1:0)+(rnd(9)-4),y:30+row*26,vx:(rnd(81)-40),vy:0,done:false,still:0,cool:0,tr:[]}});
+    return {p:ps[pi],col:NEON[pi%NEON.length],x:WW/2+(col-(cols-1)/2)*(WW-80)/Math.max(1,cols-1)*(cols>1?1:0)+(rnd(9)-4),y:30+row*26,vx:(rnd(81)-40),vy:0,done:false,still:0,cool:0,tr:[],rx:0,ry:0,rt:0}});
   const fin=[];let alive=true,raf=0,running=false,t=0,ended=false,count=null,shake=0,camY=0,zoom=1;
   const millSegs=(m,tt)=>{const out=[],a=m.a0+m.w*tt;for(let i=0;i<m.n;i++){const q=a+i*Math.PI*2/m.n;out.push([m.x,m.y,m.x+Math.cos(q)*m.L,m.y+Math.sin(q)*m.L])}return out};
   const barX=(b,tt)=>WW/2+b.amp*Math.sin(b.w*tt+b.ph);
@@ -1818,6 +1818,7 @@ function mountMarble(st,ctl,ps,k){
     act.forEach(b=>{
       const sp=Math.hypot(b.vx,b.vy);b.still=sp<25?b.still+dt:0;
       if(b.still>1.2){b.vx+=(rnd(2)?1:-1)*(120+rnd(80));b.vy-=180;b.still=0}
+      b.rt+=dt;if(b.rt>=0.7){const moved=Math.hypot(b.x-b.rx,b.y-b.ry);if(moved<8&&!doors.some(d=>Math.abs(b.y-d.a[1])<BR+4)){const dir=b.x<WW/2?1:-1;b.x+=dir*6;b.vx=dir*(180+rnd(80));b.vy=-140}b.rx=b.x;b.ry=b.y;b.rt=0}
       b.x=Math.max(BR,Math.min(WW-BR,b.x));
       if(b.y>FIN+BR){b.done=true;fin.push(b);b.vx=b.vy=0}
     });
