@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.14.1">
+<meta name="app-version" content="1.15.0">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -427,6 +427,15 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
 .cf-more{color:var(--accent,#2563EB);font-weight:600}
 .cfd{display:flex;flex-direction:column;gap:14px}
+.ac-list{display:flex;flex-direction:column}
+.ac-row{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line-soft)}.ac-row:first-child{border-top:0}
+.ac-row.off .txt b{text-decoration:line-through;color:var(--muted)}
+.ac-ops{display:flex;gap:6px;flex-wrap:wrap}
+.ac-tag{font-size:12px;font-weight:700;color:#B91C1C;background:#FEE2E2;border-radius:999px;padding:2px 8px}.ac-tag.soft{color:#92400E;background:#FEF3C7}
+.ac-new{border:1px solid #F6C27A;background:#FFF8EC;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;color:#5A3000}
+.ac-new pre{margin:0;white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.6}
+.ac-add{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.au-cp summary{cursor:pointer;font-weight:600;padding:6px 0}.au-cp[open]{display:flex;flex-direction:column;gap:8px}
 .pu-on{font-size:12.5px;font-weight:700;color:#15803D;background:#DCFCE7;border-radius:999px;padding:3px 10px}
 .chk{display:flex;gap:10px;align-items:center;font-size:15px;min-height:40px;cursor:pointer}.chk input{width:20px;height:20px;accent-color:#2563EB}
 #cfBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-140%);transition:transform .25s ease;z-index:200;width:min(560px,calc(100% - 20px));display:flex;align-items:center;gap:6px;padding:10px 8px 10px 12px;border-radius:16px;background:#FFF4E5;border:1px solid #F6C27A;color:#5A3000;box-shadow:0 12px 30px rgba(15,23,42,.22)}
@@ -1261,6 +1270,145 @@ function cfOpenPending(){
   if(S.view!=='coffee')go('coffee');
   setTimeout(()=>{openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r));const b=$('cfReplay');if(b)b.onclick=()=>{closeSheet();startReplay(r)}},50);
 }
+/* ---------- 직원 계정 (로그인 준비: 계정만 미리 만들고, 로그인 의무화는 나중에) ---------- */
+const EMAIL_DOMAIN='staff.hanbit-schedule.app',SITE_URL='https://hbjtron-yg.github.io/hanbit-schedule/';
+S.acct={status:null,list:null,busy:false,created:null,ask:null};
+let AU=null;
+async function authApi(){
+  if(window.__AUTH_MOCK)return window.__AUTH_MOCK;
+  if(AU)return AU;
+  if(!db||!db.app)throw new Error('공유 저장소에 연결되지 않았어요');
+  const [M,Fn]=await Promise.all([import(db.base+'firebase-auth.js'),import(db.base+'firebase-functions.js')]);
+  const auth=M.getAuth(db.app),c=Fn.httpsCallable(Fn.getFunctions(db.app,'asia-northeast3'),'accounts');
+  AU={
+    onChange:cb=>M.onAuthStateChanged(auth,cb),
+    signIn:(id,pw)=>M.signInWithEmailAndPassword(auth,`${id}@${EMAIL_DOMAIN}`,pw),
+    signOut:()=>M.signOut(auth),
+    claims:async u=>(await u.getIdTokenResult(true)).claims||{},
+    changePw:async(cur,nw)=>{const u=auth.currentUser;await M.reauthenticateWithCredential(u,M.EmailAuthProvider.credential(u.email,cur));await M.updatePassword(u,nw)},
+    call:async(action,d)=>(await c({action,...(d||{})})).data
+  };
+  return AU;
+}
+function auErr(e){
+  const c=String(e&&e.code||''),m=String(e&&e.message||'');
+  if(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c))return '아이디 또는 비밀번호가 맞지 않아요';
+  if(/user-disabled/.test(c))return '사용이 막힌 계정이에요. 관리자에게 물어보세요';
+  if(/too-many-requests/.test(c))return '여러 번 틀려서 잠시 막혔어요. 조금 뒤에 다시 해 주세요';
+  if(/operation-not-allowed|configuration-not-found/.test(c+m))return 'Firebase에서 이메일/비밀번호 로그인을 먼저 켜 주세요';
+  if(/network/.test(c))return '인터넷 연결을 확인해 주세요';
+  if(/functions\/(not-found|internal|unavailable)/.test(c)&&!/[가-힣]/.test(m))return '계정 기능이 아직 준비 중이에요. 잠시 뒤에 다시 해 주세요';
+  return m.replace(/^Firebase:\s*/,'')||'잠시 뒤에 다시 해 주세요';
+}
+const idNorm=v=>String(v||'').trim().toLowerCase();
+const idValid=id=>/^[a-z0-9][a-z0-9._-]{2,19}$/.test(id);
+function genPw(){const cs='abcdefghjkmnpqrstuvwxyz23456789';let o='';for(let i=0;i<8;i++)o+=cs[rnd0(cs.length)];return o}
+function acctShareText(c){return `[한빛 일정] 계정 안내\n이름: ${c.name}\n아이디: ${c.id}\n${c.reset?'새 비밀번호':'첫 비밀번호'}: ${c.pw}\n주소: ${SITE_URL}\n(로그인 후 메뉴 › 계정에서 비밀번호를 바꿔 주세요)`}
+async function authInit(){
+  try{const A=await authApi();A.onChange(async u=>{
+    if(!u){S.user=null;S.acct.list=null;render();return}
+    let cl={};try{cl=await A.claims(u)}catch(e){}
+    S.user={uid:u.uid,id:String(u.email||'').split('@')[0],name:u.displayName||'',admin:!!cl.admin};render();
+    if(S.user.admin)acLoad();
+  })}catch(e){}
+}
+async function acStatus(){
+  if(S.acct.status||S.acct.stLoading)return;S.acct.stLoading=true;
+  try{S.acct.status=await (await authApi()).call('status')}catch(e){S.acct.status={err:auErr(e)}}
+  S.acct.stLoading=false;if(S.view==='menu')render();
+}
+async function acLoad(force){
+  if(!S.user||!S.user.admin)return;if(S.acct.listLoading)return;S.acct.listLoading=true;if(force)render();
+  try{S.acct.list=(await (await authApi()).call('list')).list||[]}catch(e){toast(auErr(e))}
+  S.acct.listLoading=false;if(S.view==='menu')render();
+}
+const val=id=>{const el=$(id);return el?el.value:''};
+const clr=(...ids)=>ids.forEach(id=>{const el=$(id);if(el)el.value=''});
+async function auBusy(f){if(S.acct.busy)return;S.acct.busy=true;render();try{await f()}catch(e){toast(auErr(e))}finally{S.acct.busy=false;render()}}
+function auSetup(){
+  const name=val('auName').trim(),id=idNorm(val('auId')),pw=val('auPw'),pw2=val('auPw2');
+  if(!name)return toast('이름을 넣어 주세요');if(!idValid(id))return toast('아이디는 영문 소문자·숫자로 3~20자예요');
+  if(pw.length<6)return toast('비밀번호는 6자 이상이에요');if(pw!==pw2)return toast('비밀번호 확인이 달라요');
+  auBusy(async()=>{const A=await authApi();await A.call('setup',{name,id,pw});await A.signIn(id,pw);S.acct.status={hasAny:true};clr('auName','auId','auPw','auPw2');toast('관리자 계정을 만들고 로그인했어요')});
+}
+function auLogin(){
+  const id=idNorm(val('lgId')),pw=val('lgPw');if(!id||!pw)return toast('아이디와 비밀번호를 넣어 주세요');
+  auBusy(async()=>{await (await authApi()).signIn(id,pw);clr('lgId','lgPw');toast('로그인했어요')});
+}
+function auLogout(){auBusy(async()=>{await (await authApi()).signOut();toast('로그아웃했어요')})}
+function auChangePw(){
+  const cur=val('cpCur'),nw=val('cpNew'),nw2=val('cpNew2');
+  if(!cur)return toast('지금 비밀번호를 넣어 주세요');if(nw.length<6)return toast('새 비밀번호는 6자 이상이에요');if(nw!==nw2)return toast('새 비밀번호 확인이 달라요');
+  auBusy(async()=>{const A=await authApi();await A.changePw(cur,nw);try{await A.call('pwChanged')}catch(e){}clr('cpCur','cpNew','cpNew2');toast('비밀번호를 바꿨어요');if(S.user&&S.user.admin)acLoad()});
+}
+function naAdd(){
+  const name=val('naName').trim(),id=idNorm(val('naId')),pw=val('naPw'),adm=!!($('naAdmin')&&$('naAdmin').checked);
+  if(!name)return toast('이름을 넣어 주세요');if(!idValid(id))return toast('아이디는 영문 소문자·숫자로 3~20자예요 (. _ - 가능)');if(pw.length<6)return toast('첫 비밀번호는 6자 이상이에요');
+  auBusy(async()=>{const r=await (await authApi()).call('create',{name,id,pw,admin:adm});S.acct.created={name:r.name,id:r.id,pw};clr('naName','naId','naPw');const c=$('naAdmin');if(c)c.checked=false;await acLoad()});
+}
+function acOp(op,uid){
+  const row=(S.acct.list||[]).find(x=>x.uid===uid);if(!row)return;
+  const key=op+':'+uid;const two=['reset','block','del','unadmin'].includes(op);
+  if(two&&S.acct.ask!==key){clearTimeout(S.acct.askT);S.acct.ask=key;render();S.acct.askT=setTimeout(()=>{S.acct.ask=null;render()},4000);return}
+  S.acct.ask=null;
+  auBusy(async()=>{const A=await authApi();
+    if(op==='reset'){const pw=genPw();await A.call('resetPw',{uid,pw});S.acct.created={name:row.name,id:row.id,pw,reset:true}}
+    else if(op==='block')await A.call('setActive',{uid,active:false});
+    else if(op==='unblock')await A.call('setActive',{uid,active:true});
+    else if(op==='admin')await A.call('setAdmin',{uid,admin:true});
+    else if(op==='unadmin')await A.call('setAdmin',{uid,admin:false});
+    else if(op==='del')await A.call('remove',{uid});
+    toast({reset:'비밀번호를 새로 만들었어요',block:'계정을 막았어요',unblock:'계정을 풀었어요',admin:'관리자로 지정했어요',unadmin:'관리자에서 뺐어요',del:'계정을 지웠어요'}[op]);
+    await acLoad();
+  });
+}
+function acctCard(){
+  const u=S.user,b=S.acct.busy?'disabled':'';
+  const note='<p class="small muted" style="margin:0">지금은 로그인하지 않아도 모두 쓸 수 있어요. 로그인 의무화는 관리자가 정한 날 켜져요.</p>';
+  if(u)return `<section class="card" aria-labelledby="auH"><div class="card-h"><h2 id="auH">계정</h2>${u.admin?'<span class="pu-on">관리자</span>':''}</div>
+    <p style="margin:0"><b>${esc(u.name||u.id)}</b> <span class="muted">(${esc(u.id)})</span>로 로그인돼 있어요.</p>${note}
+    <details class="au-cp"><summary>비밀번호 바꾸기</summary>
+      <div class="f"><label for="cpCur">지금 비밀번호</label><input id="cpCur" type="password" data-keep autocomplete="current-password"></div>
+      <div class="f"><label for="cpNew">새 비밀번호 (6자 이상)</label><input id="cpNew" type="password" data-keep autocomplete="new-password"></div>
+      <div class="f"><label for="cpNew2">새 비밀번호 확인</label><input id="cpNew2" type="password" data-keep autocomplete="new-password"></div>
+      <button type="button" class="btn primary" data-act="au-cp" ${b}>비밀번호 바꾸기</button></details>
+    <button type="button" class="btn ghost sm" data-act="au-logout" ${b}>로그아웃</button></section>`;
+  if(!S.acct.status)acStatus();
+  const st=S.acct.status;
+  if(st&&st.hasAny===false)return `<section class="card" aria-labelledby="auH"><div class="card-h"><h2 id="auH">계정 · 처음 설정</h2></div>
+    <p class="small" style="margin:0;color:var(--fg-2)">아직 계정이 하나도 없어요. <b>관리자(사장님) 계정</b>을 먼저 만들어 주세요. 그다음 「직원 관리」에서 직원 계정을 만들 수 있어요.</p>${note}
+    <div class="f"><label for="auName">이름</label><input id="auName" data-keep autocomplete="off" placeholder="예: 김윤재"></div>
+    <div class="f"><label for="auId">아이디 (영문 소문자·숫자 3~20자)</label><input id="auId" data-keep autocomplete="username" autocapitalize="none" placeholder="예: kimyj"></div>
+    <div class="f"><label for="auPw">비밀번호 (6자 이상)</label><input id="auPw" type="password" data-keep autocomplete="new-password"></div>
+    <div class="f"><label for="auPw2">비밀번호 확인</label><input id="auPw2" type="password" data-keep autocomplete="new-password"></div>
+    <button type="button" class="btn primary" data-act="au-setup" ${b}>관리자 계정 만들기</button></section>`;
+  return `<section class="card" aria-labelledby="auH"><div class="card-h"><h2 id="auH">계정 로그인</h2></div>${note}
+    ${st&&st.err?`<p class="small" style="margin:0;color:#B45309">${esc(st.err)}</p>`:''}
+    <div class="rowline" style="gap:8px;flex-wrap:wrap"><input class="inp" id="lgId" data-keep autocomplete="username" autocapitalize="none" placeholder="아이디" aria-label="아이디" style="flex:1;min-width:8em"><input class="inp" id="lgPw" type="password" data-keep autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" style="flex:1;min-width:8em"></div>
+    <button type="button" class="btn" data-act="au-login" ${b}>로그인</button></section>`;
+}
+function staffAdminCard(){
+  const u=S.user;if(!u||!u.admin)return '';
+  const list=S.acct.list,b=S.acct.busy?'disabled':'',ask=S.acct.ask;
+  const have=new Set((list||[]).map(x=>x.name));
+  const todo=staff().map(p=>p.name).filter(n=>!have.has(n));
+  const btn=(op,uid,label,danger)=>{const on=ask===op+':'+uid;return `<button type="button" class="btn sm${on||danger==='always'?' danger':''}${!on&&danger!=='always'?' ghost':''}" data-act="ac-op" data-op="${op}" data-uid="${esc(uid)}" ${b}>${on?'한 번 더 누르면 '+label:label}</button>`};
+  const c=S.acct.created;
+  return `<section class="card" aria-labelledby="saH"><div class="card-h"><h2 id="saH">직원 관리</h2><button type="button" class="btn ghost sm" data-act="ac-reload" ${b}>새로고침</button></div>
+    <p class="small muted" style="margin:0">관리자만 보여요. 계정을 만들면 아이디와 첫 비밀번호를 직원에게 알려 주세요. 비밀번호는 다시 볼 수 없어서 만든 직후에 복사해 두세요.</p>
+    ${c?`<div class="ac-new"><b>${c.reset?'새 비밀번호를 만들었어요':'계정을 만들었어요'}</b><pre>${esc(acctShareText(c))}</pre>
+      <div class="rowline" style="gap:8px"><button type="button" class="btn primary sm" data-act="ac-copy">${ic('copy',16)}안내 문구 복사</button><button type="button" class="btn ghost sm" data-act="ac-close">닫기</button></div></div>`:''}
+    <div class="ac-list">${list==null?'<p class="small muted" style="margin:0">불러오는 중…</p>':list.length?list.map(x=>`<div class="ac-row${x.active===false?' off':''}">
+      <div class="txt"><b>${esc(x.name)}</b> <span class="muted">${esc(x.id)}</span>${x.admin?' <span class="pu-on">관리자</span>':''}${x.active===false?' <span class="ac-tag">막힘</span>':''}${x.mustChange?' <span class="ac-tag soft">첫 비밀번호 그대로</span>':''}</div>
+      <div class="ac-ops">${btn('reset',x.uid,'비밀번호 초기화')}${x.uid===u.uid?'':(x.active===false?btn('unblock',x.uid,'막기 풀기'):btn('block',x.uid,'막기'))}${x.admin?(x.uid===u.uid?'':btn('unadmin',x.uid,'관리자 빼기')):btn('admin',x.uid,'관리자로')}${x.uid===u.uid?'':btn('del',x.uid,'삭제')}</div></div>`).join(''):'<p class="small muted" style="margin:0">아직 계정이 없어요.</p>'}</div>
+    <div class="ac-add"><h3 style="margin:0;font-size:15px">직원 계정 만들기</h3>
+      ${todo.length?`<div class="picks">${todo.map(n=>`<button type="button" class="pick" data-act="na-pick" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div><p class="small muted" style="margin:0">아직 계정이 없는 직원이에요. 누르면 이름이 채워져요.</p>`:''}
+      <div class="rowline" style="gap:8px;flex-wrap:wrap"><input class="inp" id="naName" data-keep placeholder="이름" aria-label="이름" autocomplete="off" style="flex:1;min-width:7em"><input class="inp" id="naId" data-keep placeholder="아이디 (예: yoonsj)" aria-label="아이디" autocomplete="off" autocapitalize="none" style="flex:1;min-width:9em"></div>
+      <div class="rowline" style="gap:8px"><input class="inp" id="naPw" data-keep placeholder="첫 비밀번호 (6자 이상)" aria-label="첫 비밀번호" autocomplete="off" style="flex:1;min-width:0"><button type="button" class="btn" data-act="na-gen">자동 만들기</button></div>
+      <label class="chk"><input type="checkbox" id="naAdmin"> 관리자로 만들기</label>
+      <button type="button" class="btn primary" data-act="na-add" ${b}>계정 만들기</button></div>
+  </section>`;
+}
 /* ---------- 휴대폰 알림 (웹 푸시) : 이 기기 등록 → settings/push_<id> ---------- */
 const VAPID_KEY='BF24WUp52W2TzBY7RwkuSs6FPj5n_ZjMLjQEOuOXWypSIKMncKVTyk0ndmPObIXguLqub55VZz72DlH_uEblRsE';
 const isIOS=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
@@ -1679,6 +1827,8 @@ function vMenu(){
   return `
   <div class="vh"><div class="grow"><h1>메뉴</h1></div></div>
   <div class="menu-grid">
+    ${acctCard()}
+    ${staffAdminCard()}
     ${staffEditor()}
     ${eqCard()}
     <section class="card" aria-labelledby="meH"><div class="card-h"><h2 id="meH">내 이름</h2></div>
@@ -2486,6 +2636,17 @@ const A={
   'push-on':()=>pushOn(),
   'push-off':()=>pushOff(),
   'push-test':()=>pushTest(),
+  'au-setup':()=>auSetup(),
+  'au-login':()=>auLogin(),
+  'au-logout':()=>auLogout(),
+  'au-cp':()=>auChangePw(),
+  'na-gen':()=>{const el=$('naPw');if(el)el.value=genPw()},
+  'na-pick':t=>{const el=$('naName');if(el)el.value=t.dataset.n},
+  'na-add':()=>naAdd(),
+  'ac-copy':()=>{const c=S.acct.created;if(c)copyText(acctShareText(c))},
+  'ac-close':()=>{S.acct.created=null;render()},
+  'ac-op':t=>acOp(t.dataset.op,t.dataset.uid),
+  'ac-reload':()=>acLoad(true),
   'eq-reload':()=>{if(S.equipMeta)equipMetaIn(S.equipMeta,true)},
   'eq-clear':()=>{clearTimeout(S.eqAskT);if(!S.eqAsk){S.eqAsk=true;render();S.eqAskT=setTimeout(()=>{S.eqAsk=false;render()},4000);return}S.eqAsk=false;eqClear().then(()=>toast('장비 목록을 지웠어요')).catch(()=>toast('지우지 못했어요'))},
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
@@ -2633,6 +2794,7 @@ async function boot(){
   db.collection('customers').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.customers=m;render()},onErr);
   db.doc('settings/org').onSnapshot(snap=>{S.settings=(snap&&snap.data&&snap.data())||{};render()},onErr);
   pushRefresh();
+  authInit();
   db.doc('settings/equip').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||null;equipMetaIn(d)},()=>{});
   db.doc('settings/coffee').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||{};S.coffee=Array.isArray(d.log)?d.log:[];cfNotify();render();cfOpenPending()},()=>{});
 }

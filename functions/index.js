@@ -66,3 +66,108 @@ exports.pushWelcome = fn().firestore.document('settings/{id}').onWrite(async (ch
     tag: 'welcome'
   });
 });
+
+/* ---------- 직원 계정 (로그인 준비) ----------
+ * accounts: 앱에서 부르는 함수 하나. action 으로 구분.
+ *  status  : 계정이 하나라도 있는지 (처음 관리자 만들기 화면용)
+ *  setup   : 계정이 하나도 없을 때만 첫 관리자 만들기
+ *  list / create / resetPw / setActive / setAdmin / rename / remove : 관리자만
+ *  pwChanged : 본인이 비밀번호를 바꿨다고 표시
+ * 계정 정보는 Firestore accounts/<uid> (앱의 임시 규칙으로는 못 읽는 곳), 비밀번호는 Firebase 로그인 시스템에만.
+ */
+const EMAIL_DOMAIN = 'staff.hanbit-schedule.app';
+const HE = (code, msg) => new functions.https.HttpsError(code, msg);
+const idOk = id => /^[a-z0-9][a-z0-9._-]{2,19}$/.test(id);
+const pwOk = pw => typeof pw === 'string' && pw.length >= 6 && pw.length <= 64;
+
+async function createAccount(data, makeAdmin, byUid) {
+  const name = String(data.name || '').trim(), id = String(data.id || '').trim().toLowerCase(), pw = data.pw;
+  if (!name || name.length > 20) throw HE('invalid-argument', '이름을 확인해 주세요');
+  if (!idOk(id)) throw HE('invalid-argument', '아이디는 영문 소문자·숫자로 3~20자예요 (. _ - 가능)');
+  if (!pwOk(pw)) throw HE('invalid-argument', '비밀번호는 6자 이상이에요');
+  const dup = await db.collection('accounts').where('id', '==', id).limit(1).get();
+  if (!dup.empty) throw HE('already-exists', '이미 있는 아이디예요');
+  let u;
+  try { u = await admin.auth().createUser({ email: `${id}@${EMAIL_DOMAIN}`, password: pw, displayName: name }); }
+  catch (e) {
+    if (e && e.code === 'auth/email-already-exists') throw HE('already-exists', '이미 있는 아이디예요');
+    if (e && /configuration-not-found|operation-not-allowed/.test(e.code || '')) throw HE('failed-precondition', 'Firebase에서 이메일/비밀번호 로그인을 먼저 켜 주세요');
+    throw HE('internal', '계정을 만들지 못했어요: ' + ((e && e.message) || e));
+  }
+  if (makeAdmin) await admin.auth().setCustomUserClaims(u.uid, { admin: true });
+  const row = { name, id, admin: !!makeAdmin, active: true, mustChange: !!byUid, createdAt: Date.now(), by: byUid || '' };
+  await db.collection('accounts').doc(u.uid).set(row);
+  return { uid: u.uid, ...row };
+}
+
+exports.accounts = fn().https.onCall(async (data, context) => {
+  data = data || {};
+  const a = String(data.action || '');
+  const col = db.collection('accounts');
+  const me = context.auth && context.auth.uid;
+  const isAdmin = !!(context.auth && context.auth.token && context.auth.token.admin);
+
+  if (a === 'status') { const s = await col.limit(1).get(); return { hasAny: !s.empty }; }
+  if (a === 'setup') {
+    const s = await col.limit(1).get();
+    if (!s.empty) throw HE('failed-precondition', '이미 관리자 계정이 있어요. 관리자에게 계정을 받아 주세요');
+    return createAccount(data, true, '');
+  }
+  if (a === 'pwChanged') {
+    if (!me) throw HE('unauthenticated', '로그인이 필요해요');
+    await col.doc(me).set({ mustChange: false, pwAt: Date.now() }, { merge: true });
+    return { ok: true };
+  }
+  if (!isAdmin) throw HE('permission-denied', '관리자만 할 수 있어요');
+
+  if (a === 'list') {
+    const s = await col.get();
+    return { list: s.docs.map(d => ({ uid: d.id, ...d.data() })).sort((x, y) => (x.createdAt || 0) - (y.createdAt || 0)) };
+  }
+  if (a === 'create') return createAccount(data, !!data.admin, me);
+
+  const uid = String(data.uid || '');
+  const ref = col.doc(uid);
+  const doc = uid ? await ref.get() : null;
+  if (!doc || !doc.exists) throw HE('not-found', '계정을 찾지 못했어요');
+  const now = Date.now();
+  const otherAdmins = async () => (await col.where('admin', '==', true).get()).docs.filter(d => d.id !== uid && d.data().active !== false).length;
+
+  if (a === 'resetPw') {
+    if (!pwOk(data.pw)) throw HE('invalid-argument', '비밀번호는 6자 이상이에요');
+    await admin.auth().updateUser(uid, { password: data.pw });
+    await ref.set({ mustChange: true, updatedAt: now }, { merge: true });
+    return { ok: true };
+  }
+  if (a === 'setActive') {
+    const on = !!data.active;
+    if (!on && uid === me) throw HE('failed-precondition', '내 계정은 막을 수 없어요');
+    if (!on && doc.data().admin && !(await otherAdmins())) throw HE('failed-precondition', '관리자가 한 명은 있어야 해요');
+    await admin.auth().updateUser(uid, { disabled: !on });
+    if (!on) await admin.auth().revokeRefreshTokens(uid);
+    await ref.set({ active: on, updatedAt: now }, { merge: true });
+    return { ok: true };
+  }
+  if (a === 'setAdmin') {
+    const on = !!data.admin;
+    if (!on && !(await otherAdmins())) throw HE('failed-precondition', '관리자가 한 명은 있어야 해요');
+    await admin.auth().setCustomUserClaims(uid, on ? { admin: true } : {});
+    await ref.set({ admin: on, updatedAt: now }, { merge: true });
+    return { ok: true };
+  }
+  if (a === 'rename') {
+    const name = String(data.name || '').trim();
+    if (!name || name.length > 20) throw HE('invalid-argument', '이름을 확인해 주세요');
+    await admin.auth().updateUser(uid, { displayName: name });
+    await ref.set({ name, updatedAt: now }, { merge: true });
+    return { ok: true };
+  }
+  if (a === 'remove') {
+    if (uid === me) throw HE('failed-precondition', '내 계정은 지울 수 없어요');
+    if (doc.data().admin && !(await otherAdmins())) throw HE('failed-precondition', '관리자가 한 명은 있어야 해요');
+    await admin.auth().deleteUser(uid).catch(e => { if (!(e && e.code === 'auth/user-not-found')) throw e; });
+    await ref.delete();
+    return { ok: true };
+  }
+  throw HE('invalid-argument', '알 수 없는 요청이에요');
+});
