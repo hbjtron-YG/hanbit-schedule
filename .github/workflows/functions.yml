@@ -23,5 +23,12 @@ jobs:
           if [ -z "$SA" ]; then echo "::error::GitHub 비밀 설정에 FIREBASE_SERVICE_ACCOUNT 가 없어요"; exit 1; fi
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          set +e
           npx -y firebase-tools@latest deploy --only functions --project hanbit-schedule --non-interactive --force
+          code=$?
           rm -f "$RUNNER_TEMP/sa.json"
+          if [ $code -ne 0 ] && [ -f firebase-debug.log ]; then
+            echo "----- 실패 원인 (firebase-debug.log 요약) -----"
+            grep -E '"message"|"status"|HTTP Error|Error:' firebase-debug.log | grep -viE 'token|authorization|private_key|bearer' | tail -40
+          fi
+          exit $code
