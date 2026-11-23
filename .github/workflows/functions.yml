@@ -23,6 +23,10 @@ jobs:
           if [ -z "$SA" ]; then echo "::error::GitHub 비밀 설정에 FIREBASE_SERVICE_ACCOUNT 가 없어요"; exit 1; fi
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          export FN_SA="$(jq -r .client_email "$RUNNER_TEMP/sa.json")"
+          echo "실행 계정: $FN_SA"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet >/dev/null 2>&1 || true
+          gcloud services enable compute.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --project hanbit-schedule --quiet || echo "API 켜기 실패(계속 진행)"
           set +e
           npx -y firebase-tools@latest deploy --only functions --project hanbit-schedule --non-interactive --force
           code=$?

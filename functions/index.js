@@ -8,6 +8,8 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
 const REGION = 'asia-northeast3';
+/* 실행 계정: 배포 때 GitHub Actions가 열쇠 파일의 계정(client_email)을 FN_SA로 넘겨줌 (기본 Compute 계정이 없는 프로젝트라서) */
+const fn = () => { const f = functions.region(REGION); return process.env.FN_SA ? f.runWith({ serviceAccount: process.env.FN_SA }) : f; };
 const GAME = { ladder: '사다리타기', roulette: '돌림판', snail: '달팽이 경주', marble: '구슬 떨어뜨리기', draw: '제비뽑기' };
 const DEAD = /registration-token-not-registered|invalid-registration-token|invalid-argument/;
 
@@ -28,7 +30,7 @@ async function sendTo(list, data) {
   return res.successCount;
 }
 
-exports.coffeeNotify = functions.region(REGION).firestore.document('settings/coffee').onWrite(async ch => {
+exports.coffeeNotify = fn().firestore.document('settings/coffee').onWrite(async ch => {
   const before = (ch.before.exists && ch.before.data().log) || [];
   const after = (ch.after.exists && ch.after.data().log) || [];
   const old = new Set(before.map(r => r && r.at));
@@ -50,7 +52,7 @@ exports.coffeeNotify = functions.region(REGION).firestore.document('settings/cof
   }
 });
 
-exports.pushWelcome = functions.region(REGION).firestore.document('settings/{id}').onWrite(async (ch, ctx) => {
+exports.pushWelcome = fn().firestore.document('settings/{id}').onWrite(async (ch, ctx) => {
   if (!String(ctx.params.id).startsWith('push_') || !ch.after.exists) return;
   const a = ch.after.data(), b = ch.before.exists ? ch.before.data() : null;
   if (!a.token) return;
