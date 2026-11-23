@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.16.2">
+<meta name="app-version" content="1.16.3">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -454,6 +454,7 @@ button.ev-row:hover{border-color:var(--line)}
 .ac-new pre{margin:0;white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.6}
 .ac-add{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
 .au-cp summary{cursor:pointer;font-weight:600;padding:6px 0}.au-cp[open]{display:flex;flex-direction:column;gap:8px}
+.lg-hint{display:flex;flex-direction:column;gap:4px;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E3A8A;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.5}
 .pu-on{font-size:12.5px;font-weight:700;color:#15803D;background:#DCFCE7;border-radius:999px;padding:3px 10px}
 .chk{display:flex;gap:10px;align-items:center;font-size:15px;min-height:40px;cursor:pointer}.chk input{width:20px;height:20px;accent-color:#2563EB}
 #cfBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-140%);transition:transform .25s ease;z-index:200;width:min(560px,calc(100% - 20px));display:flex;align-items:center;gap:6px;padding:10px 8px 10px 12px;border-radius:16px;background:#FFF4E5;border:1px solid #F6C27A;color:#5A3000;box-shadow:0 12px 30px rgba(15,23,42,.22)}
@@ -1371,7 +1372,8 @@ function auSetup(){
 }
 function auLogin(){
   const id=idNorm(val('lgId')),pw=val('lgPw');if(!id||!pw)return toast('아이디와 비밀번호를 넣어 주세요');
-  auBusy(async()=>{await (await authApi()).signIn(id,pw);clr('lgId','lgPw');toast('로그인했어요')});
+  auBusy(async()=>{try{await (await authApi()).signIn(id,pw)}catch(e){if(/invalid-credential|wrong-password|user-not-found|invalid-email/.test(String(e&&e.code||''))){const n=Number(store.get('hj.lgFail')||0)+1;store.set('hj.lgFail',String(n))}throw e}
+    store.set('hj.lgFail','0');clr('lgId','lgPw');toast('로그인했어요')});
 }
 function auLogout(){auBusy(async()=>{await (await authApi()).signOut();toast('로그아웃했어요')})}
 function auChangePw(){
@@ -1400,6 +1402,7 @@ function acOp(op,uid){
     await acLoad();
   });
 }
+const LOGIN_HINT=`<div class="lg-hint" role="note"><b>도움말</b><span>아이디는 <b>hbjtron 계정</b>(회사 메일 주소)이고, 비밀번호는 <b>Phone Number</b>(휴대폰 번호)예요.</span></div>`;
 function acctCard(){
   const u=S.user,b=S.acct.busy?'disabled':'';
   const note='<p class="small muted" style="margin:0">지금은 로그인하지 않아도 모두 쓸 수 있어요. 로그인 의무화는 관리자가 정한 날 켜져요.</p>';
@@ -1418,7 +1421,8 @@ function acctCard(){
   return `<section class="card" aria-labelledby="auH"><div class="card-h"><h2 id="auH">계정 로그인</h2></div>${note}
     ${st&&st.err?`<p class="small" style="margin:0;color:#B45309">${esc(st.err)}</p>`:''}
     <div class="rowline" style="gap:8px;flex-wrap:wrap"><input class="inp" id="lgId" data-keep autocomplete="username" autocapitalize="none" placeholder="아이디 (회사 메일)" aria-label="아이디" inputmode="email" style="flex:1;min-width:8em"><input class="inp" id="lgPw" type="password" data-keep autocomplete="current-password" placeholder="비밀번호" aria-label="비밀번호" style="flex:1;min-width:8em"></div>
-    <button type="button" class="btn" data-act="au-login" ${b}>로그인</button></section>`;
+    <button type="button" class="btn" data-act="au-login" ${b}>로그인</button>
+    ${Number(store.get('hj.lgFail')||0)>=5?LOGIN_HINT:''}</section>`;
 }
 function staffAdminCard(){
   const u=S.user;if(!u||!u.admin)return '';
