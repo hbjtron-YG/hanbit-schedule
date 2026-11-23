@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.13.0">
+<meta name="app-version" content="1.14.0">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -1282,14 +1282,15 @@ async function pushToken(){
   return {tok:await M.getToken(m,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg}),M,m};
 }
 function pushPrefs(){try{return JSON.parse(store.get('hj.pushPref')||'{}')}catch(e){return {}}}
-async function pushSave(tok){
+async function pushSave(tok,extra){
   const pr=pushPrefs();const id=pushId(tok);
-  await db.doc('settings/'+id).set({kind:'push',token:tok,name:(store.get('hj.meSet')==='1'&&S.me)?S.me:'',dev:pushDev(),coffee:pr.coffee!==false,at:Date.now()});
+  await db.doc('settings/'+id).set({kind:'push',token:tok,name:(store.get('hj.meSet')==='1'&&S.me)?S.me:'',dev:pushDev(),coffee:pr.coffee!==false,at:Date.now(),...(extra||{})});
   const old=store.get('hj.push');if(old&&old!==id)db.doc('settings/'+old).delete().catch(()=>{});
   store.set('hj.push',id);
 }
 async function pushOn(){
   const sp=pushSupport();if(sp!=='ok'){render();return}
+  if(!(store.get('hj.meSet')==='1'&&S.me)){toast('먼저 위 「내 이름」을 저장해 주세요. 내가 참가한 커피내기만 알림이 와요');const el=$('meName');if(el){el.scrollIntoView({block:'center'});el.focus()}return}
   S.pushBusy=true;render();
   try{
     const perm=await Notification.requestPermission();
@@ -1306,6 +1307,11 @@ async function pushOff(){
     store.set('hj.push','');toast('이 기기 알림을 껐어요')}
   finally{S.pushBusy=false;render()}
 }
+async function pushTest(){
+  S.pushBusy=true;render();
+  try{const {tok}=await pushToken();await pushSave(tok,{testAt:Date.now()});toast('시험 알림을 보냈어요. 몇 초 안에 와요')}catch(e){toast((e&&e.message)||'시험 알림을 보내지 못했어요')}
+  finally{S.pushBusy=false;render()}
+}
 async function pushRefresh(){/* 켜 둔 기기는 열 때마다 알림 주소·이름을 새로 저장 */
   try{if(!store.get('hj.push')||pushSupport()!=='ok'||Notification.permission!=='granted')return;const {tok}=await pushToken();if(tok)await pushSave(tok)}catch(e){}
 }
@@ -1316,11 +1322,12 @@ function pushCard(){
     :sp==='http'?'보안 주소(https)에서만 쓸 수 있어요.'
     :sp==='no'?'이 브라우저는 알림을 지원하지 않아요. 크롬이나 설치한 앱에서 열어 주세요.'
     :(typeof Notification!=='undefined'&&Notification.permission==='denied')?'이 기기에서 알림이 차단돼 있어요. 브라우저(또는 휴대폰) 설정 › 사이트 설정 › 알림에서 이 사이트를 허용해 주세요.'
-    :on?'이 기기에서 알림을 받고 있어요. 앱을 닫아 둬도 와요.':'켜면 앱을 닫아 둬도 이 기기로 알림이 와요.';
+    :on?'이 기기에서 알림을 받고 있어요. 앱을 닫아 둬도 와요.':'켜면 앱을 닫아 둬도 이 기기로 알림이 와요. 커피내기는 내가 참가한 판만 와요 (위 「내 이름」 기준).';
   return `<section class="card" aria-labelledby="puH"><div class="card-h"><h2 id="puH">휴대폰 알림</h2>${on?'<span class="pu-on">켜짐</span>':''}</div>
     <p class="small" style="margin:0;color:var(--fg-2)">${msg}</p>
     ${sp==='ok'?(on?`<label class="chk"><input type="checkbox" id="puCoffee" ${pr.coffee!==false?'checked':''}> 커피내기 결과</label>
-      <button type="button" class="btn ghost sm" data-act="push-off" ${S.pushBusy?'disabled':''}>이 기기 알림 끄기</button>`
+      <div class="rowline" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-act="push-test" ${S.pushBusy?'disabled':''}>${ic('bell',16)}시험 알림 보내기</button><button type="button" class="btn ghost sm" data-act="push-off" ${S.pushBusy?'disabled':''}>이 기기 알림 끄기</button></div>
+      <p class="small muted" style="margin:0">${(store.get('hj.meSet')==='1'&&S.me)?`「${esc(S.me)}」 이름으로 등록돼 있어요. 이 이름이 참가한 커피내기만 알림이 와요.`:'「내 이름」을 저장해야 커피내기 알림이 와요.'}</p>`
       :`<button type="button" class="btn primary" data-act="push-on" ${S.pushBusy?'disabled':''}>${ic('bell',18)}이 기기에서 알림 받기</button>`):''}
     <p class="small muted" style="margin:0">일정 입력 알림 같은 다른 알림도 여기에 추가될 거예요.</p>
   </section>`;
@@ -1674,11 +1681,11 @@ function vMenu(){
   <div class="menu-grid">
     ${staffEditor()}
     ${eqCard()}
-    ${pushCard()}
     <section class="card" aria-labelledby="meH"><div class="card-h"><h2 id="meH">내 이름</h2></div>
       <p class="small muted" style="margin:0">일정 담당자와 요청 작성자 칸에 미리 채워져요. 이 기기에만 저장돼요.</p>
       <div class="rowline"><input class="inp" id="meName" data-keep value="${esc(S.me)}" placeholder="이름" autocomplete="off" aria-label="내 이름" style="flex:1;min-width:8em"><button type="button" class="btn primary" data-act="save-me">저장</button></div>
     </section>
+    ${pushCard()}
     <section class="card" aria-labelledby="thH"><div class="card-h"><h2 id="thH">화면 테마</h2></div>
       <div class="seg" role="group" aria-label="화면 테마">${[['system','기기 설정'],['light','라이트'],['dark','다크']].map(([k,l])=>`<button type="button" data-act="theme" data-v="${k}" aria-pressed="${S.theme===k}">${l}</button>`).join('')}</div>
       <p class="small muted" style="margin:0">기기 설정을 고르면 휴대폰이나 PC의 다크 모드를 그대로 따라가요.</p>
@@ -2478,6 +2485,7 @@ const A={
   'eq-up':()=>eqUpload(),
   'push-on':()=>pushOn(),
   'push-off':()=>pushOff(),
+  'push-test':()=>pushTest(),
   'eq-reload':()=>{if(S.equipMeta)equipMetaIn(S.equipMeta,true)},
   'eq-clear':()=>{clearTimeout(S.eqAskT);if(!S.eqAsk){S.eqAsk=true;render();S.eqAskT=setTimeout(()=>{S.eqAsk=false;render()},4000);return}S.eqAsk=false;eqClear().then(()=>toast('장비 목록을 지웠어요')).catch(()=>toast('지우지 못했어요'))},
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
@@ -2499,7 +2507,7 @@ const A={
     S.cfAsk=null;const gone=(S.coffee||[]).filter(r=>k==='all'||String(r.at)===k);if(db)gone.forEach(r=>{if(r.rp)db.doc('settings/cfr-'+r.at).delete().catch(()=>{})});
     const log=k==='all'?[]:(S.coffee||[]).filter(r=>String(r.at)!==k);S.coffee=log;render();toast(k==='all'?'결과를 모두 지웠어요':'결과를 지웠어요');
     if(db)db.doc('settings/coffee').set({log}).catch(()=>toast('지우지 못했어요'))},
-  'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);store.set('hj.meSet','1');toast(S.me?'저장했어요':'이름을 지웠어요');render()},
+  'save-me':()=>{S.me=$('meName').value.trim();store.set('hj.me',S.me);store.set('hj.meSet','1');toast(S.me?'저장했어요':'이름을 지웠어요');render();pushRefresh()},
   'weather':()=>openWeather()
 };
 const stripId=o=>{const {id,...r}=o;return r};
