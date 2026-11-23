@@ -12,7 +12,7 @@ const REGION = 'asia-northeast3';
 const fn = () => { const f = functions.region(REGION); return process.env.FN_SA ? f.runWith({ serviceAccount: process.env.FN_SA }) : f; };
 const GAME = { ladder: '사다리타기', roulette: '돌림판', snail: '달팽이 경주', marble: '구슬 떨어뜨리기', draw: '제비뽑기' };
 /* 시험 기간: 커피내기 결과 알림은 이 계정(로그인 이름)의 기기에만. '' 이면 원래대로 참가자에게 */
-const CF_NOTIFY_ONLY = '송윤근';
+const CF_NOTIFY_ONLY = '';
 const DEAD = /registration-token-not-registered|invalid-registration-token|invalid-argument/;
 
 async function sendTo(list, data) {
