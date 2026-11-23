@@ -77,18 +77,20 @@ exports.pushWelcome = fn().firestore.document('settings/{id}').onWrite(async (ch
  */
 const EMAIL_DOMAIN = 'staff.hanbit-schedule.app';
 const HE = (code, msg) => new functions.https.HttpsError(code, msg);
-const idOk = id => /^[a-z0-9][a-z0-9._-]{2,19}$/.test(id);
+const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+const idOk = id => /^[a-z0-9][a-z0-9._-]{2,19}$/.test(id) || (id.length <= 80 && EMAIL_RE.test(id));
+const loginEmail = id => id.includes('@') ? id : `${id}@${EMAIL_DOMAIN}`;
 const pwOk = pw => typeof pw === 'string' && pw.length >= 6 && pw.length <= 64;
 
 async function createAccount(data, makeAdmin, byUid) {
   const name = String(data.name || '').trim(), id = String(data.id || '').trim().toLowerCase(), pw = data.pw;
   if (!name || name.length > 20) throw HE('invalid-argument', '이름을 확인해 주세요');
-  if (!idOk(id)) throw HE('invalid-argument', '아이디는 영문 소문자·숫자로 3~20자예요 (. _ - 가능)');
+  if (!idOk(id)) throw HE('invalid-argument', '아이디는 회사 메일 주소이거나, 영문 소문자·숫자 3~20자예요');
   if (!pwOk(pw)) throw HE('invalid-argument', '비밀번호는 6자 이상이에요');
   const dup = await db.collection('accounts').where('id', '==', id).limit(1).get();
   if (!dup.empty) throw HE('already-exists', '이미 있는 아이디예요');
   let u;
-  try { u = await admin.auth().createUser({ email: `${id}@${EMAIL_DOMAIN}`, password: pw, displayName: name }); }
+  try { u = await admin.auth().createUser({ email: loginEmail(id), password: pw, displayName: name }); }
   catch (e) {
     if (e && e.code === 'auth/email-already-exists') throw HE('already-exists', '이미 있는 아이디예요');
     if (e && /configuration-not-found|operation-not-allowed/.test(e.code || '')) throw HE('failed-precondition', 'Firebase에서 이메일/비밀번호 로그인을 먼저 켜 주세요');
