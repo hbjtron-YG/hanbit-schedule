@@ -11,6 +11,8 @@ const REGION = 'asia-northeast3';
 /* 실행 계정: 배포 때 GitHub Actions가 열쇠 파일의 계정(client_email)을 FN_SA로 넘겨줌 (기본 Compute 계정이 없는 프로젝트라서) */
 const fn = () => { const f = functions.region(REGION); return process.env.FN_SA ? f.runWith({ serviceAccount: process.env.FN_SA }) : f; };
 const GAME = { ladder: '사다리타기', roulette: '돌림판', snail: '달팽이 경주', marble: '구슬 떨어뜨리기', draw: '제비뽑기' };
+/* 시험 기간: 커피내기 결과 알림은 이 계정(로그인 이름)의 기기에만. '' 이면 원래대로 참가자에게 */
+const CF_NOTIFY_ONLY = '송윤근';
 const DEAD = /registration-token-not-registered|invalid-registration-token|invalid-argument/;
 
 async function sendTo(list, data) {
@@ -40,7 +42,8 @@ exports.coffeeNotify = fn().firestore.document('settings/coffee').onWrite(async 
   for (const r of fresh) {
     const names = new Set(r.names || []);
     const list = [];
-    snap.forEach(d => { const t = d.data(); if (t.token && t.coffee !== false && t.name && names.has(t.name)) list.push({ id: d.id, token: t.token }); });
+    snap.forEach(d => { const t = d.data(); if (!t.token || t.coffee === false) return;
+      if (CF_NOTIFY_ONLY ? t.acct === CF_NOTIFY_ONLY : (t.name && names.has(t.name))) list.push({ id: d.id, token: t.token }); });
     const who = (r.losers || []).join(', ');
     const n = await sendTo(list, {
       title: '☕ 커피내기 결과가 나왔어요!',
