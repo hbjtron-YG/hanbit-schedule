@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <!-- 앱 버전: 수정할 때마다 여기 한 곳만 올림 (CHANGELOG.md 참고) -->
-<meta name="app-version" content="1.12.0">
+<meta name="app-version" content="1.13.0">
 <meta name="googlebot" content="noindex, nofollow">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>한빛제이트론 현장 일정</title>
@@ -427,6 +427,8 @@ button.ev-row:hover{border-color:var(--line)}
 .cf-open:focus-visible{outline:2px solid var(--accent,#2563EB);outline-offset:3px}
 .cf-more{color:var(--accent,#2563EB);font-weight:600}
 .cfd{display:flex;flex-direction:column;gap:14px}
+.pu-on{font-size:12.5px;font-weight:700;color:#15803D;background:#DCFCE7;border-radius:999px;padding:3px 10px}
+.chk{display:flex;gap:10px;align-items:center;font-size:15px;min-height:40px;cursor:pointer}.chk input{width:20px;height:20px;accent-color:#2563EB}
 #cfBanner{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translate(-50%,-140%);transition:transform .25s ease;z-index:200;width:min(560px,calc(100% - 20px));display:flex;align-items:center;gap:6px;padding:10px 8px 10px 12px;border-radius:16px;background:#FFF4E5;border:1px solid #F6C27A;color:#5A3000;box-shadow:0 12px 30px rgba(15,23,42,.22)}
 #cfBanner.in{transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){#cfBanner{transition:none}}
@@ -634,6 +636,7 @@ const P={
   ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   cloud:'<circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M2.5 8H1M3.6 3.6l1 1M12.4 3.6l-1 1"/><path d="M8.5 20h9a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.6A3.3 3.3 0 0 0 8.5 20z"/>',
   x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  bell:'<path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/>',
   list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
   door:'<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="2.6"/><path d="M8 17c.8-1.8 2.2-2.6 4-2.6s3.2.8 4 2.6"/>',
   tool:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 21h10M12 17v4M7 12l3-3 3 2 4-4"/>',
@@ -1253,6 +1256,75 @@ function cfBanner(r){
   try{navigator.vibrate&&navigator.vibrate([80,60,80])}catch(e){}
   S.cfBT=setTimeout(close,15000);
 }
+function cfOpenPending(){
+  if(!S.pendingCf)return;const r=(S.coffee||[]).find(x=>String(x.at)===String(S.pendingCf));if(!r)return;S.pendingCf=null;
+  if(S.view!=='coffee')go('coffee');
+  setTimeout(()=>{openSheet(cfDetail(r),cfGameName(r.game)+' 진행 기록',cfWhen(r));const b=$('cfReplay');if(b)b.onclick=()=>{closeSheet();startReplay(r)}},50);
+}
+/* ---------- 휴대폰 알림 (웹 푸시) : 이 기기 등록 → settings/push_<id> ---------- */
+const VAPID_KEY='BF24WUp52W2TzBY7RwkuSs6FPj5n_ZjMLjQEOuOXWypSIKMncKVTyk0ndmPObIXguLqub55VZz72DlH_uEblRsE';
+const isIOS=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}};
+function pushSupport(){
+  if(location.protocol!=='https:'&&location.hostname!=='localhost')return 'http';
+  if(isIOS()&&!isStandalone())return 'ios-browser';
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))return 'no';
+  return 'ok';
+}
+function pushDev(){const u=navigator.userAgent;return /iPhone/.test(u)?'아이폰':/iPad/.test(u)?'아이패드':/Android/.test(u)?(/Mobile/.test(u)?'안드로이드 폰':'안드로이드 태블릿'):/Windows/.test(u)?'윈도우 PC':/Mac/.test(u)?'맥':'기기'}
+function pushId(tok){let h=5381;for(let i=0;i<tok.length;i++)h=((h*33)^tok.charCodeAt(i))>>>0;return 'push_'+h.toString(36)+tok.length.toString(36)}
+async function pushToken(){
+  const reg=await navigator.serviceWorker.register('sw.js',{scope:'./'});await navigator.serviceWorker.ready;
+  if(!db||!db.app)throw new Error('공유 저장소에 연결되지 않았어요');
+  const M=await import(db.base+'firebase-messaging.js');
+  if(M.isSupported&&!(await M.isSupported()))throw new Error('이 브라우저는 알림을 지원하지 않아요');
+  const m=M.getMessaging(db.app);
+  return {tok:await M.getToken(m,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg}),M,m};
+}
+function pushPrefs(){try{return JSON.parse(store.get('hj.pushPref')||'{}')}catch(e){return {}}}
+async function pushSave(tok){
+  const pr=pushPrefs();const id=pushId(tok);
+  await db.doc('settings/'+id).set({kind:'push',token:tok,name:(store.get('hj.meSet')==='1'&&S.me)?S.me:'',dev:pushDev(),coffee:pr.coffee!==false,at:Date.now()});
+  const old=store.get('hj.push');if(old&&old!==id)db.doc('settings/'+old).delete().catch(()=>{});
+  store.set('hj.push',id);
+}
+async function pushOn(){
+  const sp=pushSupport();if(sp!=='ok'){render();return}
+  S.pushBusy=true;render();
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast(perm==='denied'?'알림이 차단돼 있어요. 브라우저 설정에서 이 사이트 알림을 허용해 주세요':'알림을 허용하지 않았어요');return}
+    const {tok}=await pushToken();if(!tok)throw new Error('알림 주소를 받지 못했어요');
+    await pushSave(tok);toast('이 기기에서 알림을 받아요');
+  }catch(e){toast((e&&e.message)||'알림을 켜지 못했어요')}
+  finally{S.pushBusy=false;render()}
+}
+async function pushOff(){
+  S.pushBusy=true;render();
+  try{const id=store.get('hj.push');if(id&&db)await db.doc('settings/'+id).delete().catch(()=>{});
+    try{const {M,m}=await pushToken();await M.deleteToken(m)}catch(e){}
+    store.set('hj.push','');toast('이 기기 알림을 껐어요')}
+  finally{S.pushBusy=false;render()}
+}
+async function pushRefresh(){/* 켜 둔 기기는 열 때마다 알림 주소·이름을 새로 저장 */
+  try{if(!store.get('hj.push')||pushSupport()!=='ok'||Notification.permission!=='granted')return;const {tok}=await pushToken();if(tok)await pushSave(tok)}catch(e){}
+}
+function pushCard(){
+  const sp=pushSupport(),on=!!store.get('hj.push')&&sp==='ok'&&typeof Notification!=='undefined'&&Notification.permission==='granted';
+  const pr=pushPrefs();
+  const msg=sp==='ios-browser'?'아이폰은 Safari에서 「공유 → 홈 화면에 추가」로 설치한 앱에서 켤 수 있어요 (iOS 16.4 이상).'
+    :sp==='http'?'보안 주소(https)에서만 쓸 수 있어요.'
+    :sp==='no'?'이 브라우저는 알림을 지원하지 않아요. 크롬이나 설치한 앱에서 열어 주세요.'
+    :(typeof Notification!=='undefined'&&Notification.permission==='denied')?'이 기기에서 알림이 차단돼 있어요. 브라우저(또는 휴대폰) 설정 › 사이트 설정 › 알림에서 이 사이트를 허용해 주세요.'
+    :on?'이 기기에서 알림을 받고 있어요. 앱을 닫아 둬도 와요.':'켜면 앱을 닫아 둬도 이 기기로 알림이 와요.';
+  return `<section class="card" aria-labelledby="puH"><div class="card-h"><h2 id="puH">휴대폰 알림</h2>${on?'<span class="pu-on">켜짐</span>':''}</div>
+    <p class="small" style="margin:0;color:var(--fg-2)">${msg}</p>
+    ${sp==='ok'?(on?`<label class="chk"><input type="checkbox" id="puCoffee" ${pr.coffee!==false?'checked':''}> 커피내기 결과</label>
+      <button type="button" class="btn ghost sm" data-act="push-off" ${S.pushBusy?'disabled':''}>이 기기 알림 끄기</button>`
+      :`<button type="button" class="btn primary" data-act="push-on" ${S.pushBusy?'disabled':''}>${ic('bell',18)}이 기기에서 알림 받기</button>`):''}
+    <p class="small muted" style="margin:0">일정 입력 알림 같은 다른 알림도 여기에 추가될 거예요.</p>
+  </section>`;
+}
 function cfLoadTape(at){
   return new Promise(res=>{if(!db){res(null);return}let un=null,done=false;
     const fin=v=>{if(done)return;done=true;try{un&&un()}catch(e){}res(v)};
@@ -1602,6 +1674,7 @@ function vMenu(){
   <div class="menu-grid">
     ${staffEditor()}
     ${eqCard()}
+    ${pushCard()}
     <section class="card" aria-labelledby="meH"><div class="card-h"><h2 id="meH">내 이름</h2></div>
       <p class="small muted" style="margin:0">일정 담당자와 요청 작성자 칸에 미리 채워져요. 이 기기에만 저장돼요.</p>
       <div class="rowline"><input class="inp" id="meName" data-keep value="${esc(S.me)}" placeholder="이름" autocomplete="off" aria-label="내 이름" style="flex:1;min-width:8em"><button type="button" class="btn primary" data-act="save-me">저장</button></div>
@@ -2403,6 +2476,8 @@ const A={
   'report':()=>openReport(),
   'xlsx':()=>openXlsx(),
   'eq-up':()=>eqUpload(),
+  'push-on':()=>pushOn(),
+  'push-off':()=>pushOff(),
   'eq-reload':()=>{if(S.equipMeta)equipMetaIn(S.equipMeta,true)},
   'eq-clear':()=>{clearTimeout(S.eqAskT);if(!S.eqAsk){S.eqAsk=true;render();S.eqAskT=setTimeout(()=>{S.eqAsk=false;render()},4000);return}S.eqAsk=false;eqClear().then(()=>toast('장비 목록을 지웠어요')).catch(()=>toast('지우지 못했어요'))},
   'lad-every':()=>{const L=ladInit();const pool=ladPool();if(L.names.length===Math.min(pool.length,LAD_MAX)){L.names=[];L.extra=L.extra.filter(x=>staff().some(p=>p.name===x))}else L.names=pool.slice(0,LAD_MAX);ladSort();ladSave();render()},
@@ -2433,6 +2508,12 @@ document.addEventListener('click',e=>{
   const f=A[t.dataset.act];if(f){e.preventDefault();f(t,e)}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='ladNew'){e.preventDefault();A['lad-add']()}});
+document.addEventListener('change',e=>{
+  if(e.target&&e.target.id==='puCoffee'){const pr=pushPrefs();pr.coffee=e.target.checked;store.set('hj.pushPref',JSON.stringify(pr));
+    const id=store.get('hj.push');if(id&&db)pushRefresh().then(()=>toast(pr.coffee?'커피내기 결과 알림을 받아요':'커피내기 결과 알림을 안 받아요'))}
+});
+/* 알림을 눌러 이미 열린 창으로 왔을 때 */
+try{navigator.serviceWorker&&navigator.serviceWorker.addEventListener('message',e=>{const d=e.data||{};if(d.type==='open'&&d.url){try{const q=new URLSearchParams(new URL(d.url).hash.slice(1));const cf=q.get('cf');if(cf){S.pendingCf=cf;cfOpenPending()}else if(q.get('v')&&VIEWS.includes(q.get('v')))go(q.get('v'))}catch(err){}}})}catch(e){}
 document.addEventListener('input',e=>{
   if(e.target.id==='cq'){S.cq=e.target.value;renderContactResults()}
   const lm=/^lad-n-(\d+)$/.exec(e.target.id||'');
@@ -2471,7 +2552,7 @@ async function connectFirebase(){
   const [A,F]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-firestore.js')]);
   const app=A.initializeApp(FIREBASE_CONFIG);
   const fs=F.initializeFirestore(app,{ignoreUndefinedProperties:true});
-  return {
+  return {app,base,
     collection:name=>({
       add:data=>F.addDoc(F.collection(fs,name),data),
       onSnapshot:(next,err)=>F.onSnapshot(F.collection(fs,name),{includeMetadataChanges:true},next,err)
@@ -2502,6 +2583,7 @@ function saveLoc(){
     S.view=(v==='play'||v==='ladder')?'coffee':v;
     const ym=(q.get('ym')||'').split('-').map(Number);if(ym[0]&&ym[1]){S.y=ym[0];S.m=ym[1]-1}
     if(/^\d{4}-\d{2}-\d{2}$/.test(q.get('d')||''))S.sel=q.get('d');
+    if(/^\d+$/.test(q.get('cf')||''))S.pendingCf=q.get('cf');
     if(['cust','hanbit','keysight'].includes(q.get('t')))S.ctab=q.get('t');
     if(v==='customer'){S.custKey=q.get('c');S.site=q.get('s');if(!S.custKey)S.view='contacts'}
   }catch(e){}
@@ -2542,8 +2624,9 @@ async function boot(){
   db.collection('requests').onSnapshot(snap=>{S.requests=docs(snap);render()},onErr);
   db.collection('customers').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.customers=m;render()},onErr);
   db.doc('settings/org').onSnapshot(snap=>{S.settings=(snap&&snap.data&&snap.data())||{};render()},onErr);
+  pushRefresh();
   db.doc('settings/equip').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||null;equipMetaIn(d)},()=>{});
-  db.doc('settings/coffee').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||{};S.coffee=Array.isArray(d.log)?d.log:[];cfNotify();render()},()=>{});
+  db.doc('settings/coffee').onSnapshot(snap=>{const d=(snap&&snap.data&&snap.data())||{};S.coffee=Array.isArray(d.log)?d.log:[];cfNotify();render();cfOpenPending()},()=>{});
 }
 boot();
 })();
